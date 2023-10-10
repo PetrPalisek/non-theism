@@ -1,0 +1,145 @@
+library(lavaan)
+library(semTools)
+library(semPlot)
+library(gorica)
+
+
+# Goals -------------------------------------------------------------------
+
+# BiG is 3 categories, can be thought of as latent continuum #
+
+# MS is a scale, maybe can be left as normally distributed (even better if we could apply a skew) #
+
+# Gender is 2 categories, no latent continuum
+
+# Ed and ParEd can be made into 3 categories (< HS, HS, College+), no latent continuum
+# However, we have 2 parents, so we might need to use just one or do joint categories
+
+# Mir is a nice latent var, we can even compute scale reliability. 8 MVs, three categories #
+
+# Judge is dichotomous, may be a latent continuum
+# Careful, Judge is NA if BiG == "no", maybe set it to 0 artificially? 
+# We can do a sensitivity check afterwards but it might be a problem
+
+# Rit - two items, can do a latent but unsure, 7 response categories, latent continuum
+# In other words: how to incorporate reading scriptures, my hunch would be to leave that out
+
+# ColRit, 7 categories (reverse ordered), latent continuum
+
+# Religion a nominal variable, exogenous dummies
+
+# ParStress is 4 categories, latent continuum, reverse ordered
+
+# ParRit, 7 categories, latent continuum, reverse ordered
+
+# RelEdu - do I understand it correctly that it is basically "do they attend a religious school, or not?"
+# In that case, 2 levels, no latent continuum
+
+# Age is simply counted in years, nothing latent there
+
+
+# Initial simulation ------------------------------------------------------
+
+
+# Specify the true model
+model_true <- "# AR paths: BiG
+          BiG4 ~ .5*BiG2
+          BiG2 ~ .7*BiG1
+          
+          # MiR measurement model
+          Mir2 =~ .6*Mir_2_1 + .6*Mir_2_2 + .6*Mir_2_3 + .6*Mir_2_4 + .6*Mir_2_5 + .6*Mir_2_6 + .6*Mir_2_7
+
+
+          # Main CL path of interest
+          BiG4 ~ -.3*MS1
+          
+          # Education collider paths
+          Ed4 ~ .5*ParEd1
+          BiG4 ~ .2*Ed4
+
+          # Explanatory paths
+          BiG4 ~ .2*Rit2 + .1*Mir2 + .15*Judge2 + .1*ColRit2
+
+          # Controls
+          BiG1 + BiG2 + BiG4 ~ .05*Gender
+          BiG4 ~ -.05*Age + -.2*Edu4 + .05*ParStress + .2*RelEd + .1*ParRit
+          RelEd ~ .4*ParRit
+          
+          # Unit effects
+          eta_BiG =~ 1*BiG1 + 1*BiG2 + 1*BiG4
+          eta_MS =~ 1*MS1 + 1*MS2"
+
+# Use lavaan's simulateData function
+sim_data <- lavaan::simulateData(model_true, standardized = F, sample.nobs = 3000)
+
+# Specify the blind model
+model <- "#AR paths: BiG
+          BiG4 ~ BiG2
+          BiG2 ~ BiG1
+          
+          # MiR measurement model
+          Mir2 =~ Mir_2_1 + Mir_2_2 + Mir_2_3 + Mir_2_4 + Mir_2_5 + Mir_2_6 + Mir_2_7
+
+
+          # Main CL path of interest
+          BiG4 ~ MS1
+          
+          # Education collider paths
+          Ed4 ~ ParEd1
+          BiG4 ~ Ed4
+
+          # Explanatory paths
+          BiG4 ~ Rit2 + Mir2 + Judge2 + ColRit2
+
+          # Controls
+          BiG1 + BiG2 + BiG4 ~ Gender
+          BiG4 ~ Age + Edu4 + ParStress + RelEd + ParRit
+          RelEd ~ .4*ParRit
+          
+          # Unit effects
+          eta_BiG =~ 1*BiG1 + 1*BiG2 + 1*BiG4"
+
+# Check the result
+fit <- lavaan::sem(model, sim_data, meanstructure = T)
+lavaan::summary(fit, std = T, rsquare = T)
+semPlot::semPaths(fit, what = "std", layout = "spring", intercepts = F)
+
+
+# Modification ------------------------------------------------------------
+
+
+# Modify the data so that the simulated variables correspond to those in the dataset
+
+# BiG 1, 2, 4 has 3 categories, is ordinal
+sim_data$BiG1 <- as.numeric(ggplot2::cut_number(sim_data$BiG1, 3, labels = c(0, 1, 3)))
+sim_data$BiG2 <- as.numeric(ggplot2::cut_number(sim_data$BiG2, 3, labels = c(0, 1, 3)))
+sim_data$BiG4 <- as.numeric(ggplot2::cut_number(sim_data$BiG4, 3, labels = c(0, 1, 3)))
+sim_data$Gender <- as.numeric(ggplot2::cut_number(sim_data$Gender, 2, labels = c(0, 1)))
+
+# Refit the model
+
+refit <- lavaan::sem(model, sim_data, ordered = c("BiG1", "BiG2", "BiG4"))
+lavaan::summary(refit, std = T)
+semPlot::semPaths(refit, what = "std", layout = "spring", thresholds = F)
+
+
+
+
+# Hypothesis test ---------------------------------------------------------
+
+
+# Test the hypotheses using GORICA
+
+# The effect of MS1 on BiG4 is negative
+H1 <- "a < 0"
+
+gorica::gorica(fit, H1, comparison = "unconstrained")
+gorica::gorica(fit, H1, comparison = "complement")
+
+
+# The total effect of explanatory variables is positive (?)
+H2 <- "a+b+c+d+e > b+c+d+e"
+
+gorica::gorica(fit, H2, comparison = "unconstrained")
+
+# (also) The effect of MS is >> than the total effect of explanatory variables?

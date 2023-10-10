@@ -1,0 +1,27 @@
+{
+    "id": "F4CB0778",
+    "path": "~/atheism/simulation.R",
+    "project_path": "simulation.R",
+    "type": "r_source",
+    "hash": "3289074431",
+    "contents": "",
+    "dirty": false,
+    "created": 1696370713997.0,
+    "source_on_save": false,
+    "relative_order": 1,
+    "properties": {
+        "tempName": "Untitled1",
+        "source_window_id": "",
+        "Source": "Source",
+        "cursorPosition": "127,0",
+        "scrollLine": "108"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1696938245,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1696938245056,
+    "read_only": false,
+    "read_only_alternatives": []
+}
