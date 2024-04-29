@@ -85,7 +85,7 @@ df$PRAYALON_W3 <- ifelse(df$PRAYALON_W3 > 7, NA, df$PRAYALON_W3)
 
 df$TRUST_W2 <- ifelse(df$TRUST_W2 > 4, NA, df$TRUST_W2)
 
-df$HEALTH_W3 <- ifelse(df$HEALTH_W3 == 999, NA, df$TRUST_W2)
+df$HEALTH_W3 <- ifelse(df$HEALTH_W3 == 999, NA, df$HEALTH_W3)
 
 df$EARNINGS_W4 <- ifelse(df$EARNINGS_W4 == 17, NA, df$EARNINGS_W4)
 
@@ -97,14 +97,32 @@ df$EARNINGS_W4 <- ifelse(df$EARNINGS_W4 == 17, NA, df$EARNINGS_W4)
 # df$GOD_W3 yes / no / unsure ( 1, 2, 3)
 # df$GOD_W4 no / yes / unsure ( 0, 1, 2)
 
-df$GOD_W1 <- ifelse(df$GOD_W1 == 777, 1.5, df$GOD_W1)
-df$GOD_W2 <- ifelse(df$GOD_W2 == 3, 1.5, df$GOD_W2)
-df$GOD_W3 <- ifelse(df$GOD_W3 == 3, 1.5, df$GOD_W3)
+df <- df %>%
+  mutate(GOD_W1 = case_when(
+    GOD_W1 == 1 ~ "Yes",
+    GOD_W1 == 2 ~ "No",
+    GOD_W1 == 777 ~ "Unsure",
+    TRUE ~ NA
+  )) %>%
+  mutate(GOD_W2 = case_when(
+    GOD_W2 == 1 ~ "Yes",
+    GOD_W2 == 2 ~ "No",
+    GOD_W2 == 3 ~ "Unsure",
+    TRUE ~ NA
+  )) %>%
+  mutate(GOD_W3 = case_when(
+    GOD_W3 == 1 ~ "Yes",
+    GOD_W3 == 2 ~ "No",
+    GOD_W3 == 3 ~ "Unsure",
+    TRUE ~ NA
+  )) %>%
+  mutate(GOD_W4 = case_when(
+    GOD_W4 == 1 ~ "Yes",
+    GOD_W4 == 0 ~ "No",
+    GOD_W4 == 2 ~ "Unsure",
+    TRUE ~ NA
+  ))
 
-
-df$GOD_W4 <- ifelse(df$GOD_W4 == 0, 2,
-                    ifelse(df$GOD_W4 == 1, 1,
-                           ifelse(df$GOD_W4 == 2, 1.5, df$GOD_W4)))
 
 # Recoding factor variable values to characters
 
@@ -135,11 +153,11 @@ df <- df %>%
     ETHRACE_W1 == 5 ~ "Black",
     ETHRACE_W1 == 6 ~ "Latinx",
     ETHRACE_W1 == 7 ~ "Latinx",
-    ETHRACE_W1 == 8 ~ "Asian",
-    ETHRACE_W1 == 9 ~ "Asian",
+    ETHRACE_W1 == 8 ~ "Other",
+    ETHRACE_W1 == 9 ~ "Other",
     ETHRACE_W1 == 10 ~ "Other",
-    ETHRACE_W1 == 11 ~ "Native",
-    ETHRACE_W1 == 12 ~ "Native",
+    ETHRACE_W1 == 11 ~ "Other",
+    ETHRACE_W1 == 12 ~ "Other",
     ETHRACE_W1 == 14 ~ "Other",
     ETHRACE_W1 == 15 ~ "Other",
   )) %>%
@@ -149,10 +167,10 @@ df <- df %>%
     RELTRAD_W1 == 3 ~ "BlackProt",
     RELTRAD_W1 == 4 ~ "Catholic",
     RELTRAD_W1 == 5 ~ "Jewish",
-    RELTRAD_W1 == 6 ~ "Mormon",
+    RELTRAD_W1 == 6 ~ "Other",
     RELTRAD_W1 == 7 ~ "None",
     RELTRAD_W1 == 8 ~ "Other",
-    RELTRAD_W1 == 9 ~ "Indeter",
+    RELTRAD_W1 == 9 ~ "Other",
   ))
 
 # Creating dummy variables
@@ -163,8 +181,12 @@ dummies <- fastDummies::dummy_cols(df[,c("I_GENDER_W1", "PRACE_W1", "ETHRACE_W1"
                                    remove_selected_columns = T)
 
 names(dummies) <- c("Female", "AsianPR", "BlackPR", "LatinxPR", "NativePR", "OtherPR", 
-                    "AsianE", "BlackE", "LatinxE", "NativeE", "OtherE",
-                    "BlackProt", "Catholic", "Indeter", "Jewish","MainProt", "Mormon", "None", "OtherRel")
+                    "BlackE", "LatinxE", "OtherE",
+                    "BlackProt", "Catholic", "Jewish","MainProt", "None", "OtherRel")
+
+dummies_cors <- round(cor(dummies, use = "pairwise"),2)
+
+psych::describe(dummies)
 
 df <- cbind(df, dummies)
 
@@ -181,19 +203,223 @@ names(df) <- c("id", "Gender", "PRACE", "ETHRACE", "Age", "MS1", "BiG1",
                "H2", "CR2_1", "CR2_2", "PR2", "T2", "BiG3", "H3", "CR3_1", "CR3_2",
                "PR3", "BiG4", "H4", "CR4_1", "CR4_2", "PR4", "Inc4", names(df)[31:ncol(df)])
 
+
+df$CR2 <- ifelse(df$CR2_1 == 0, 0,  df$CR2_2)
+df$CR3 <- ifelse(df$CR3_1 == 0, 0,  df$CR4_2)
+df$CR4 <- ifelse(df$CR4_1 == 0, 0,  df$CR4_2)
+
+# Recodes to allow model identification
+
+#df$H2 <- ifelse(df$H2 == 5, 4, df$H2)
+
 # Descriptives ------------------------------------------------------------
-table(df$BiG1)
 
 # H3?
 
 base <- "
-   BiG3 ~ Female + BlackProt + Catholic + MainProt + Mormon + None + OtherRel + AsianE + BlackE + LatinxE + NativeE + OtherE
-   BiG4 ~ Age + Female + BlackProt + Catholic + MainProt + Mormon + None + OtherRel + AsianE + BlackE + LatinxE + NativeE + OtherE
-   BiG3 ~ BiG2 + MS1 + H2 + T2
-   BiG4 ~ BiG3 + MS1 + H2 + T2
+
+   BiG1 ~ Female + BlackProt + Catholic + MainProt  + None + OtherRel + BlackE + LatinxE + OtherE
+
+   BiG2 ~ Female + BlackProt + Catholic + MainProt  + None + OtherRel + BlackE + LatinxE + OtherE
+
+
+   BiG3 ~ Female + BlackProt + Catholic + MainProt  + None + OtherRel + BlackE + LatinxE + OtherE
+   BiG4 ~ Age + Female + BlackProt + Catholic + MainProt  + None + OtherRel + BlackE + LatinxE  + OtherE
+  
+   BiG2 ~ BiG1 + h1a*MS1
    
+   BiG3 ~ ar3*BiG2 + h1b*MS1 + h2.1a*H2 + h2.2a*T2 + PR2 + CR2
+   BiG4 ~ ar4*BiG3 + h1c*MS1 + h2.1b*H2 + h2.2b*T2 + h3.1b*PR3 + h3.2b*CR3 + h2.1d*H3
+   
+   eta_BiG =~ 1*BiG1 + 1*BiG2 + 1*BiG3 + 1*BiG4
+
+   
+   # CR
+
+CR2 ~ MS1
+CR3 ~ CR2 + MS1 + H2 + h3.2a*T2
+
+# PR
+
+PR2 ~ MS1
+PR3 ~ PR2 + MS1 + h3.1a*H2 + T2
+
+# H
+
+H2 ~ MS1
+H3 ~ arH*H2
+
+# T
+
+T2 ~ MS1
+
+# Mediation paths  
+
+
+## MS1 -> BiG2 -> BiG3
+
+ms1_big3 := h1a*ar3
+
+## MS1 -> BiG3 -> BiG4
+
+ms1_big4 := h1b*ar4
+
+## H2 -> BiG3 -> BiG4
+
+h2_big4 := h2.1a*ar4
+
+## T2 -> BiG3 -> BiG4
+
+t2_big4 := h2.2a*ar4
+
+## H2 -> H3 -> BiG4
+
+h2_h3_big4 := arH*h2.1d
+
+h1a_ := h1a
+h1b_ := h1b
+h1c_ := h1c
+
+## H2 -> PR3 -> BiG4
+
+h3.1indirect := h3.1a*h3.1b
+h3.1direct := h2.1b
+
+## T2 -> CR3 -> BiG4
+
+h3.2indirect := h3.2a*h3.2b
+h3.2direct := h2.2b
+
 "
 
-base_fit <- sem(base, df, ordered = T, estimator = "WLSMV")
+fit <- sem(base, df, ordered = c("BiG1","BiG2", "BiG3", "BiG4",
+                                      "CR2", "CR3", "PR2", "PR3", "H2", "H3", "T2"), meanstructure = T,
+                estimator = "WLSMV", missing = "pairwise", parameterization = "theta")
+
+lavaanExtra::nice_lavaanPlot(base_fit, stand = T)
 
 summary(base_fit, std = T, fit = T)
+
+modificationindices(base_fit, sort. = T)
+
+
+# Hypothesis tests --------------------------------------------------------
+
+
+  
+  # Test the hypotheses using GORICA
+  
+  # H1: The (total) effect of MS1 on BiG4 is negative
+  H1 <- "h1a_ + h1b_ + h1c_ + ms1_big3 + ms1_big4 < 0"
+
+indices <- c(which(standardizedSolution(fit)[, 'label'] == "h1a_"),
+             which(standardizedSolution(fit)[, 'label'] == "h1b_"),
+             which(standardizedSolution(fit)[, 'label'] == "h1c_"),
+             which(standardizedSolution(fit)[, 'label'] == "ms1_big3"),
+             which(standardizedSolution(fit)[, 'label'] == "ms1_big4"),
+             which(standardizedSolution(fit)[, 'label'] == "h2_big4"),
+             which(standardizedSolution(fit)[, 'label'] == "t2_big4"),             
+             which(standardizedSolution(fit)[, 'label'] == "h3.1direct"),
+             which(standardizedSolution(fit)[, 'label'] == "h3.1indirect"),
+             which(standardizedSolution(fit)[, 'label'] == "h3.2direct"),
+             which(standardizedSolution(fit)[, 'label'] == "h3.2indirect"),
+             which(standardizedSolution(fit)[, 'label'] == "h2_h3_big4"))
+
+
+est <- standardizedSolution(fit)[indices, 'est.std'] # estimates
+VCOV <- lavInspect(fit, "vcov.def.std.all") # cov. matrix
+
+names(est) <- c("h1a_", "h1b_", "h1c_", 
+                "ms1_big3", "ms1_big4",
+                "h2_big4", "t2_big4",
+                "h3.1direct", "h3.1indirect", "h3.2direct", "h3.2indirect",
+                "h2_h3_big4")
+
+
+restriktor::goric(est, VCOV = VCOV,
+                  hypotheses = list(H1), comparison = "complement")
+
+# H2.1: 
+# H2 -> BiG4
+# If H1+, then:
+
+H2.1 <- "h3.1direct + h2_big4 + h2_h3_big4 < 0"
+
+restriktor::goric(est, VCOV = VCOV,
+                  hypotheses = list(
+                    H2.1), comparison = "complement")
+# H2.2: 
+# T2 -> BiG4
+# If H1+, then:
+
+H2.2 <- "h3.2direct + t2_big4 < 0"
+
+restriktor::goric(est, VCOV = VCOV,
+                  hypotheses = list(
+                    H2.2), comparison = "complement")
+
+# Explanatory paths
+
+# H3.1: 
+# H2 -> PR3 -> BiG4
+
+# Is there any indirect effect?
+H3.1any <- "abs(h3.1indirect) > 0" 
+
+# First as complement
+
+restriktor::goric(est, VCOV = VCOV,
+                  hypotheses = list(
+                    H3.1any = H3.1any), comparison = "complement")
+
+
+# Is there partial mediation 
+H3.1part <- "abs(h3.1indirect) > 0 ; abs(h3.1direct) > 0"
+
+# Is there full mediation
+H3.1full <- "abs(h3.1indirect) > 0 ; abs(h3.1direct) = 0"
+
+restriktor::goric(est, VCOV = VCOV,
+                  hypotheses = list(
+                    H3.1part = H3.1part,
+                    H3.1full = H3.1full), comparison = "unconstrained")
+
+# If par. med supported, then:
+# Is there par. med with negative indirect eff?
+H3.1partneg <- "h3.2indirect < 0 ; abs(h3.2direct) > 0"
+
+restriktor::goric(est, VCOV = VCOV,
+                  hypotheses = list(
+                    H3.1partneg = H3.1partneg), comparison = "complement")
+
+# H3.2: 
+# T2 -> CR3 -> BiG4
+
+# Is there any indirect effect?
+H3.2any <- "abs(h3.2indirect) > 0"
+
+# First as complement
+
+restriktor::goric(est, VCOV = VCOV,
+                  hypotheses = list(
+                    H3.2any = H3.2any), comparison = "complement")
+
+
+# Is there partial mediation 
+H3.2part <- "abs(h3.2indirect) > 0 ; abs(h3.2direct) > 0"
+
+# Is there full mediation
+H3.2full <- "abs(h3.2indirect) > 0 ; abs(h3.2direct) > 0"
+
+
+restriktor::goric(est, VCOV = VCOV,
+                  hypotheses = list(H3.2part = H3.2part,
+                                    H3.2full = H3.2full), comparison = "unconstrained")
+
+# If par. med supported, then:
+# Is there par. med with negative indirect eff?
+H3.2partneg <- "h3.2indirect < 0 ; abs(h3.2direct) > 0"
+
+restriktor::goric(est, VCOV = VCOV,
+                  hypotheses = list(
+                    H3.2partneg = H3.2partneg), comparison = "complement")
