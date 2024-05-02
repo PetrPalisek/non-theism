@@ -66,6 +66,7 @@ df$GOD_W4 <- ifelse(df$GOD_W4 > 4, NA, df$GOD_W4)
 df$PEDUC1_W1 <- ifelse(df$PEDUC1_W1 > 4, NA, df$PEDUC1_W1)
 df$PSPEDUC1_W1 <- ifelse(df$PSPEDUC1_W1 > 4, NA, df$PSPEDUC1_W1)
 df$PEDUC3_W1 <- ifelse(df$PEDUC3_W1 > 12, NA, df$PEDUC3_W1)
+# M: how is parent education calculated, is it the same as we proposed (taking the highest degree of both parents)
 
 df$PATTEND_W1 <- ifelse(df$PATTEND_W1 == 888, NA, df$PATTEND_W1)
 df$PSTRESS_W1 <- ifelse(df$PSTRESS_W1 > 5, NA, df$PSTRESS_W1)
@@ -122,6 +123,9 @@ df <- df %>%
     GOD_W4 == 2 ~ "Unsure",
     TRUE ~ NA
   ))
+#M: Does it mean that the model will treat "Unsure" as the middle category?
+# This is the order we agreed on, right?
+
 
 
 # Recoding factor variable values to characters
@@ -191,6 +195,8 @@ psych::describe(dummies)
 df <- cbind(df, dummies)
 
 # Deleting non-Christian participants (WHAT TO DO WITH Unaffiliated, other and indeterminate?)
+# M: Good question - since we are removing from the analysis people who are not Christians,
+# we should remove OtherRel and also None
 
 table(df$RELTRAD_W1)
 
@@ -214,7 +220,19 @@ df$CR4 <- ifelse(df$CR4_1 == 0, 0,  df$CR4_2)
 
 # Descriptives ------------------------------------------------------------
 
+#M: Can we have a look at how much missing data do we have?
+# make sure we do with missing data what we promised to do
+# I know we had some worries that those who are likely to drop out may be also likely to gave-up belief
+
+#M: I am thinking about plotting the overall trends in beliefs across waves, can explain in person
+# a plot that would be nicely descriptive and would give a lot of information about the demographics and missingess
+
+
+
 # H3?
+
+# M: should we also include education?
+# M: Are we worried about the fit indices of this model?
 
 base <- "
 
@@ -292,11 +310,12 @@ h3.2direct := h2.2b
 
 "
 
-fit <- sem(base, df, ordered = c("BiG1","BiG2", "BiG3", "BiG4",
+# M: change to base_fit because there was no base_fit for the code down below
+base_fit <- sem(base, df, ordered = c("BiG1","BiG2", "BiG3", "BiG4",
                                       "CR2", "CR3", "PR2", "PR3", "H2", "H3", "T2"), meanstructure = T,
                 estimator = "WLSMV", missing = "pairwise", parameterization = "theta")
 
-lavaanExtra::nice_lavaanPlot(base_fit, stand = T)
+lavaanExtra::nice_lavaanPlot(base_fit, stand = T) 
 
 summary(base_fit, std = T, fit = T)
 
