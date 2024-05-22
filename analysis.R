@@ -133,10 +133,7 @@ df <- df %>%
     TRUST_W2 == 3 ~ "0.5",
     TRUST_W2 == 1 ~ "1"
   ))
-<<<<<<< Updated upstream
 
-=======
->>>>>>> Stashed changes
 
 # Recoding factor variable values to characters
 
@@ -261,10 +258,7 @@ psych::describe(dummies)
 
 df <- cbind(df, dummies)
 
-<<<<<<< Updated upstream
 # Deleting non-Christian participants (WHAT TO DO WITH Unaffiliated, other and indeterminate?)
-=======
->>>>>>> Stashed changes
 
 table(df$RELTRAD_W1)
 
@@ -280,7 +274,7 @@ names(df) <- c("id", "Gender", "PRACE", "ETHRACE", "Age", "MS1", "BiG1",
 
 
 df$CR2 <- ifelse(df$CR2_1 == 0, 0,  df$CR2_2)
-df$CR3 <- ifelse(df$CR3_1 == 0, 0,  df$CR4_2)
+df$CR3 <- ifelse(df$CR3_1 == 0, 0,  df$CR3_2)
 df$CR4 <- ifelse(df$CR4_1 == 0, 0,  df$CR4_2)
 
 df$MS1 <- as.numeric(df$MS1)
@@ -288,9 +282,6 @@ df$ParRit <- ifelse(df$ParRit == 777, NA, df$ParRit)
 
 # Descriptives ------------------------------------------------------------
 
-<<<<<<< Updated upstream
-# H3?
-=======
 Amelia::missmap(df, rank.order = F)
 
 na_sum <- data.frame(lapply(df, function(x) sum(is.na(x))))
@@ -310,8 +301,6 @@ psych::describe(df[,c("BiG1", "BiG2", "BiG3", "BiG4")])
 
 #M: I am thinking about plotting the overall trends in beliefs across waves, can explain in person
 # a plot that would be nicely descriptive and would give a lot of information about the demographics and missingess
-
->>>>>>> Stashed changes
 
 base <- "
   
@@ -385,24 +374,24 @@ full <- "
    
    eta_BiG =~ BiG1 + 1*BiG2 + 1*BiG3 + 1*BiG4
    
+  # PR
+
+   PR2 ~ MS1
+   PR3 ~ PR2 + MS1 + h3.1a*H2 + T2
+   
+   # H
+
+   H2 ~ MS1
+   H3 ~ arH*H2
+   
+   # T
+
+   T2 ~ MS1
+   
    # CR
 
-CR2 ~ MS1
-CR3 ~ CR2 + MS1 + H2 + h3.2a*T2
-
-# PR
-
-PR2 ~ MS1
-PR3 ~ PR2 + MS1 + h3.1a*H2 + T2
-
-# H
-
-H2 ~ MS1
-H3 ~ arH*H2
-
-# T
-
-T2 ~ MS1
+   CR2 ~ MS1
+   CR3 ~ CR2 + MS1 + H2 + h3.2a*T2
 
   # Misc
 
@@ -416,24 +405,44 @@ T2 ~ MS1
   Inc3 ~ MS1
   ParRit ~ College + HighSchool
   
-  
+     PR2 ~ 0
+   PR3 ~ 0
   
 
 "
 
-full_fit <- sem(full, df, ordered = c("BiG1","BiG2", "BiG3", "BiG4", "ParRit",
-                                      "CR2", "CR3", "PR2", "PR3", "H2", "H3", "T2"), meanstructure = T,
+full <- "# PR
+
+   PR2 ~ MS1
+   PR3 ~ PR2 + MS1 + h3.1a*H2 + T2
+   
+   PR2 ~ 0
+   PR3 ~ 0
+   
+   # H
+
+   H2 ~ MS1
+   H3 ~ arH*H2
+   
+   # T
+
+   T2 ~ MS1
+   
+   # CR
+
+   CR2 ~ MS1
+   CR3 ~ CR2 + MS1 + H2 + h3.2a*T2"
+
+full_fit <- lavaan(full, df, ordered = c("BiG1","BiG2", "BiG3", "BiG4", "ParRit",
+                                      "CR2", "CR3", "H2", "H3", "T2"), meanstructure = T,
                 estimator = "WLSMV", missing = "pairwise", parameterization = "theta")
 
-lavaanExtra::nice_lavaanPlot(full_fit, stand = T) 
 
 summary(full_fit, std = T, fit = T)
 
 modificationindices(full_fit, sort. = T)
 
 " 
-   
-
 
 # Mediation paths  
 
