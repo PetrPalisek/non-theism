@@ -280,6 +280,10 @@ df$CR4 <- ifelse(df$CR4_1 == 0, 0,  df$CR4_2)
 df$MS1 <- as.numeric(df$MS1)
 df$ParRit <- ifelse(df$ParRit == 777, NA, df$ParRit)
 
+#df$CR3 <- ifelse(df$CR3 %in% c(0,1), 0, 1)
+#df$CR2 <- ifelse(df$CR2 %in% c(0,1), 0, 1)
+
+
 # Descriptives ------------------------------------------------------------
 
 Amelia::missmap(df, rank.order = F)
@@ -360,81 +364,88 @@ summary(controls_fit, std = T, fit = T)
 restriktor::goric(controls_fit,
                   hypotheses = list(base_h1), comparison = "complement")
 
-
-full <- "
-  BiG1 ~ Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE + OtherE
+Martins <- "
+   BiG1 ~ Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE + OtherE
    BiG2 ~ Male + BlackProt + Catholic + MainProt   + BlackE + LatinxE + OtherE
    BiG3 ~ Male + BlackProt + Catholic + MainProt + BlackE + LatinxE + OtherE
-   BiG4 ~ Age + Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE  + OtherE + Inc3 + ParRit
-
+   BiG4 ~ Age + Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE  + OtherE +
+   Inc3 + ParRit + College + HighSchool
+ 
   
    BiG2 ~ BiG1 + h1a*MS1
-   BiG3 ~ ar3*BiG2 + h1b*MS1 + h2.1a*H2 + h2.2a*T2 + PR2 + CR2
+   BiG3 ~ ar3*BiG2 + h1b*MS1  + h2.1a*H2 + h2.2a*T2 + PR2 + CR2
    BiG4 ~ ar4*BiG3 + h1c*MS1 + h2.1b*H2 + h2.2b*T2 + h3.1b*PR3 + h3.2b*CR3 + h2.1d*H3
-   
-   eta_BiG =~ BiG1 + 1*BiG2 + 1*BiG3 + 1*BiG4
-   
-  # PR
-
+   eta_BiG =~ 1*BiG1 + 1*BiG2 + 1*BiG3 + 1*BiG4
+     # PR
+ 
    PR2 ~ MS1
    PR3 ~ PR2 + MS1 + h3.1a*H2 + T2
-   
-   # H
-
+   PR4 ~ PR3 + MS1
+ 
+  # H
+ 
    H2 ~ MS1
    H3 ~ arH*H2
-   
-   # T
-
-   T2 ~ MS1
-   
-   # CR
-
+   H4 ~ H3
+  # CR
+ 
    CR2 ~ MS1
    CR3 ~ CR2 + MS1 + H2 + h3.2a*T2
+   CR4 ~ CR3 + MS1
+   # T
+ 
+  T2 ~ MS1
 
   # Misc
-
+ 
   MS1 ~ ParCollege + ParHighSchool + BlackE + LatinxE + OtherE
-  
   BlackProt ~ BlackE
   Catholic ~ LatinxE
-  
-  College + HighSchool ~ ParCollege + ParHighSchool + Age + MS1
-  
+  College + HighSchool~ ParCollege + ParHighSchool + Age + MS1
   Inc3 ~ MS1
-  ParRit ~ College + HighSchool
-  
-     PR2 ~ 0
-   PR3 ~ 0
-  
-
+  Inc4 ~ Inc3
+  ParRit ~ ParCollege + ParHighSchool
+  # Mediation paths  
+ 
+ 
+## MS1 -> BiG2 -> BiG3
+ 
+ms1_big3 := h1a*ar3
+ 
+## MS1 -> BiG3 -> BiG4
+ 
+ms1_big4 := h1b*ar4
+ 
+## H2 -> BiG3 -> BiG4
+ 
+h2_big4 := h2.1a*ar4
+ 
+## T2 -> BiG3 -> BiG4
+ 
+t2_big4 := h2.2a*ar4
+ 
+## H2 -> H3 -> BiG4
+ 
+h2_h3_big4 := arH*h2.1d
+ 
+h1a_ := h1a
+h1b_ := h1b
+h1c_ := h1c
+ 
+## H2 -> PR3 -> BiG4
+ 
+h3.1indirect := h3.1a*h3.1b
+h3.1direct := h2.1b
+ 
+## T2 -> CR3 -> BiG4
+ 
+h3.2indirect := h3.2a*h3.2b
+h3.2direct := h2.2b
 "
 
-full <- "# PR
-
-   PR2 ~ MS1
-   PR3 ~ PR2 + MS1 + h3.1a*H2 + T2
-   
-   PR2 ~ 0
-   PR3 ~ 0
-   
-   # H
-
-   H2 ~ MS1
-   H3 ~ arH*H2
-   
-   # T
-
-   T2 ~ MS1
-   
-   # CR
-
-   CR2 ~ MS1
-   CR3 ~ CR2 + MS1 + H2 + h3.2a*T2"
-
-full_fit <- lavaan(full, df, ordered = c("BiG1","BiG2", "BiG3", "BiG4", "ParRit",
-                                      "CR2", "CR3", "H2", "H3", "T2"), meanstructure = T,
+full_fit <- sem(Martins, df, ordered = c("BiG1","BiG2", "BiG3", "BiG4","T2","PR2","PR3","PR4",
+                                         "CR2","CR3","CR4","H2","H3","H4","ParRit"),
+                meanstructure = T,
                 estimator = "WLSMV", missing = "pairwise", parameterization = "theta")
 
 
@@ -479,7 +490,6 @@ h3.1direct := h2.1b
 ## T2 -> CR3 -> BiG4
 
 h3.2indirect := h3.2a*h3.2b
-<<<<<<< Updated upstream
 h3.2direct := h2.2b
 
 "
@@ -494,9 +504,7 @@ summary(base_fit, std = T, fit = T)
 
 modificationindices(base_fit, sort. = T)
 
-=======
-h3.2direct := h2.2b"
->>>>>>> Stashed changes
+h3.2direct := h2.2b
 
 # Hypothesis tests --------------------------------------------------------
 fit <- base_fit
