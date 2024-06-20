@@ -507,7 +507,7 @@ modificationindices(base_fit, sort. = T)
 h3.2direct := h2.2b
 
 # Hypothesis tests --------------------------------------------------------
-fit <- base_fit
+fit <- full_fit_linear
 
   
   # Test the hypotheses using GORICA
