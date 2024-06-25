@@ -10,6 +10,9 @@ library(fastDummies)
 library(Amelia)
 library(psych)
 
+source("https://raw.githubusercontent.com/PetrPalisek/gorica_helpers/main/gorica_pool_lavaan_definedparams.R")
+set.seed(3333)
+
 # Load data
 w1 <- readxl::read_excel("nsyr1.xlsx")
 w2 <- readxl::read_excel("nsyr2.xlsx")
@@ -372,10 +375,9 @@ ggplot(long_df, aes(x = TimePoint, fill = Belief)) +
 
 # Imputation --------------------------------------------------------------
 
-set.seed(44)
 
 # Number of imputed df 
-N.Imp <-  10
+N.Imp <-  50
 
 # Create a column that contain the appropreate model for each variable - this only works if the variable is of the correct data type in the first place 
 names(df)
@@ -436,23 +438,97 @@ h1c_ := h1c
 base_mi <- semTools::runMI(base, mice.imp, fun = "sem", ordered = c("BiG1","BiG2", "BiG3", "BiG4"), meanstructure = T,
                            estimator = "WLSMV", missing = "pairwise", parameterization = "theta")
 
+base_goricas <- gorica_pool_lavaan_definedparams(mice.imp, base, "WLSMV", ordered = c("BiG1","BiG2", "BiG3", "BiG4"),
+                                hypothesis = "h1a_ + h1b_ + h1c_ + ms1_big3 + ms1_big4 < 0",
+                                 hypothesis_elements = c("h1a_", "h1b_", "h1c_", "ms1_big3", "ms1_big4"))
+
+### Controls model
+
+controls <- "
+   BiG1 ~ Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE + OtherE
+   BiG2 ~ Male + BlackProt + Catholic + MainProt   + BlackE + LatinxE + OtherE
+   BiG3 ~ Male + BlackProt + Catholic + MainProt + BlackE + LatinxE + OtherE
+   BiG4 ~ Age + Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE  + OtherE +
+   Inc3 + ParRit + College + HighSchool + PST
+
+  
+   BiG2 ~ BiG1 + h1a*MS1
+   BiG3 ~ ar3*BiG2 + h1b*MS1 
+   BiG4 ~ ar4*BiG3 + h1c*MS1 
+   
+   eta_BiG =~ BiG1 + 1*BiG2 + 1*BiG3 + 1*BiG4
+
+  # Misc
+
+  MS1 ~ ParCollege + ParHighSchool + BlackE + LatinxE + OtherE
+  
+  BlackProt ~ BlackE
+  Catholic ~ LatinxE
+  BlackProt + MainProt + Catholic ~ OtherE
+  College + HighSchool ~ ParCollege + ParHighSchool + Age + MS1
+  
+  Inc3 ~ MS1
+  ParRit ~ ParCollege + ParHighSchool
+  
+  ## MS1 -> BiG2 -> BiG3
+
+ms1_big3 := h1a*ar3
+
+## MS1 -> BiG3 -> BiG4
+
+ms1_big4 := h1b*ar4
+
+h1a_ := h1a
+h1b_ := h1b
+h1c_ := h1c
+  
+"
+
+controls_mi <- semTools::runMI(controls, mice.imp, fun = "sem", 
+                               ordered = c("BiG1","BiG2", "BiG3", "BiG4", "ParRit", "PST"), meanstructure = T,
+                               estimator = "WLSMV", missing = "pairwise", parameterization = "theta")
+
+lavaan.mi::standardizedSolution.mi(controls_mi)
+
+summary(controls_mi)
+fit_controls <- lavaan::sem(controls, data.frame(mice.imp[1]), ordered = c("BiG1","BiG2", "BiG3", "BiG4", "ParRit", "PST"), meanstructure = T,
+                            estimator = "WLSMV", missing = "pairwise", parameterization = "theta")
+
+hypothesis_elements = c("h1a_", "h1b_", "h1c_", "ms1_big3", "ms1_big4")
+
+for (i in seq_along(hypothesis_elements)) {
+  param <- hypothesis_elements[i]
+  indices[i] <- which(lavaan.mi::standardizedSolution.mi(controls_mi)[, 'label'] == param)
+}
+
+est <- lavaan.mi::standardizedSolution.mi(controls_mi)[indices, 'est.std'] # estimates
+
+VCOV <- vcov(controls_mi, type = "user") # covariance matrix
+
+names(est) <- hypothesis_elements
+
+restriktor::goric(est, VCOV = VCOV,
+                                   hypotheses = list(hypothesis), comparison = "complement")
+
+summary(fit_controls)
+
+base_goricas <- gorica_pool_lavaan_definedparams(mice.imp, base, 
+                                                 "WLSMV", ordered = c("BiG1","BiG2", "BiG3", "BiG4"),
+                                                 hypothesis = "h1a_ + h1b_ + h1c_ + ms1_big3 + ms1_big4 < 0",
+                                                 hypothesis_elements = c("h1a_", "h1b_", "h1c_", "ms1_big3", "ms1_big4"))
+
+
+controls_goricas <- gorica_pool_lavaan_definedparams(mice.imp, controls, 
+                                                     "WLSMV", ordered = c("BiG1","BiG2", "BiG3", "BiG4", "ParRit", "PST"),
+                                                 hypothesis = "h1a_ + h1b_ + h1c_ + ms1_big3 + ms1_big4 < 0",
+                                                 hypothesis_elements = c("h1a_", "h1b_", "h1c_", "ms1_big3", "ms1_big4"))
+
+hist(base_goricas/(1-base_goricas))
+
+hist(controls_goricas/(1-controls_goricas))
+
+
 # Test the hypotheses using GORICA
-
-# H1: The (total) effect of MS1 on BiG4 is negative
-H1 <- "h1a_ + h1b_ + h1c_ + ms1_big3 + ms1_big4 < 0"
-
-
-# How to get pooled standardized estimates for defined params from base_mi?
-# How to get the VCOV of defined params from base_mi?
-
-# I suppose you can do this by pooling GORICA from all the 10 datasets in mice.imp? 
-# If so, it might even be useful to have a function that does that? It would circumvent semTools altogether.
-
-# For me, it is necessary to do the following in a clean session with only semtools loaded:
-coef(base_mi, type = "user") # Here are all the ests per dataset
-vcov(base_mi, type = "pooled") # Here would be the pooled estimates (in a clean session for me :D)
-summary(base_mi, std = T, asymptotic = T, std = "std.all") # And this works weird even in a clean session :D
-
 
 ## FULL LINEAR MODEL
 
@@ -499,7 +575,7 @@ full_linear <- "
   
     # H
 
-   H2 ~ MS1
+   H2 ~ ms1_h2*MS1
    H3 ~ arH*H2
    H4 ~ H3
   
@@ -542,20 +618,35 @@ h3.1direct := h2.1b
 ## T2 -> CR3 -> BiG4
 
 h3.2indirect := h3.2a*h3.2b
-h3.2direct := h2.2b
-
-"
+h3.2direct := h2.2b"
 
 str(df)
 
-df[,c("BiG1", "BiG2", "BiG3", "BiG4", "ParRit", "PR2", 
-   "PR3", "PR4", "CR2", "CR3", "CR4", "H2", "H3", "H4", "T2", "PST")] <- lapply(df[,c("BiG1", "BiG2", "BiG3", "BiG4", "ParRit", "PR2", 
+df_ml <- df
+
+df_ml[,c("BiG1", "BiG2", "BiG3", "BiG4", "ParRit", "PR2", 
+   "PR3", "PR4", "CR2", "CR3", "CR4", "H2", "H3", "H4", "T2", "PST")] <- lapply(df_ml[,c("BiG1", "BiG2", "BiG3", "BiG4", "ParRit", "PR2", 
             "PR3", "PR4", "CR2", "CR3", "CR4", "H2", "H3", "H4", "T2", "PST")], FUN = as.numeric)
 
 
-full_fit_linear <- sem(full_linear, df, ordered =F, meanstructure = T, missing = "FIML", estimator = "MLR")
-
+full_fit_linear <- sem(full_linear, df_ml, meanstructure = T, missing = "FIML", estimator = "MLR", parameterization = "theta")
 summary(full_fit_linear, std = T, fit = T)
+
+mice.imp_lin <- mice.imp
+
+# Loop over each dataframe in the list
+for (i in 1:length(mice.imp_lin)) {
+  # Convert specified columns to numeric
+  mice.imp_lin[[i]] <- mice.imp_lin[[i]] %>%
+    mutate_at(vars(BiG1, BiG2, BiG3, BiG4, ParRit, PR2, PR3, PR4, CR2, CR3, CR4, H2, H3, H4, T2, PST), as.numeric)
+}
+
+
+linear_goricas <- gorica_pool_lavaan_definedparams(mice.imp_lin, full_linear, 
+                                                     "MLR", ordered = NULL,
+                                                     hypothesis = "h1a_ + h1b_ + h1c_ + ms1_big3 + ms1_big4 < 0",
+                                                     hypothesis_elements = c("h1a_", "h1b_", "h1c_", "ms1_big3", "ms1_big4"))
+
 
 # Hypothesis tests --------------------------------------------------------
 fit <- full_fit_linear
@@ -590,14 +681,14 @@ names(est) <- c("h1a_", "h1b_", "h1c_",
                 "h2_h3_big4")
 
 
-restriktor::goric(est, VCOV = VCOV,
+x <- restriktor::goric(est, VCOV = VCOV,
                   hypotheses = list(H1), comparison = "complement")
 
 # H2.1: 
 # H2 -> BiG4
 # If H1+, then:
 
-H2.1 <- "h3.1direct + h2_big4 + h2_h3_big4 < 0"
+H2.1 <- "h3.1direct + h2_big4 + h2_h3_big4 > 0"
 
 restriktor::goric(est, VCOV = VCOV,
                   hypotheses = list(
@@ -640,7 +731,7 @@ restriktor::goric(est, VCOV = VCOV,
 
 # If par. med supported, then:
 # Is there par. med with negative indirect eff?
-H3.1partneg <- "h3.2indirect < 0 ; abs(h3.2direct) > 0"
+H3.1partneg <- "h3.1indirect > 0 ; abs(h3.1direct) > 0"
 
 restriktor::goric(est, VCOV = VCOV,
                   hypotheses = list(
@@ -678,3 +769,10 @@ restriktor::goric(est, VCOV = VCOV,
                   hypotheses = list(
                     H3.2partneg = H3.2partneg), comparison = "complement")
 
+
+
+H2_BiG4 <- "h3.1direct + h2_big4 > 0"
+
+restriktor::goric(est, VCOV = VCOV,
+                  hypotheses = list(
+                    H2_BiG4 = H2_BiG4), comparison = "complement")
