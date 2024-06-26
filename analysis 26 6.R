@@ -459,6 +459,8 @@ hypothesis <-  "h1a_ + h1b_ + h1c_ + ms1_big3 + ms1_big4 < 0"
 H1_base <- restriktor::goric(est, VCOV = VCOV,
                   hypotheses = list(hypothesis), comparison = "complement")
 
+-0.049-0.053-0.070 -0.038-0.042
+
 
 ### Controls model
 
@@ -528,7 +530,6 @@ hypothesis <-  "h1a_ + h1b_ + h1c_ + ms1_big3 + ms1_big4 < 0"
 
 H1_controls <- restriktor::goric(est, VCOV = VCOV,
                   hypotheses = list(hypothesis), comparison = "complement")
-
 
 
 # Test the hypotheses using GORICA
@@ -767,3 +768,4 @@ restriktor::goric(est, VCOV = VCOV,
                   hypotheses = list(
                     H2_BiG4 = H2_BiG4), comparison = "complement")
 
+save.image("nontheism.RData")
