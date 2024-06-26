@@ -10,8 +10,6 @@ library(fastDummies)
 library(Amelia)
 library(psych)
 
-
-source("https://raw.githubusercontent.com/PetrPalisek/gorica_helpers/main/gorica_pool_lavaan_definedparams.R")
 set.seed(3333)
 
 # Load data
@@ -426,8 +424,6 @@ base <- "
 
 "
 
-#detach("package:lavaan.mi", unload = TRUE)
-
 base_mi <- semTools::runMI(base, mice.imp, fun = "sem", ordered = c("BiG1","BiG2", "BiG3", "BiG4"), meanstructure = T,
                            estimator = "WLSMV", missing = "pairwise", parameterization = "theta",
                            constraints = "## MS1 -> BiG2 -> BiG3
@@ -442,7 +438,7 @@ base_mi <- semTools::runMI(base, mice.imp, fun = "sem", ordered = c("BiG1","BiG2
                            h1b_ := h1b
                            h1c_ := h1c")
 
-hypothesis_elements = c("h1a_", "h1b_", "h1c_", "ms1_big3", "ms1_big4")
+hypothesis_elements <-  c("h1a_", "h1b_", "h1c_", "ms1_big3", "ms1_big4")
 
 indices <- rep(NA, length(hypothesis_elements))
 
@@ -460,7 +456,7 @@ VCOV <- standardizedSolution.mi(base_mi, return.vcov = TRUE, type = "def.std.all
 
 hypothesis <-  "h1a_ + h1b_ + h1c_ + ms1_big3 + ms1_big4 < 0"
 
-restriktor::goric(est, VCOV = VCOV,
+H1_base <- restriktor::goric(est, VCOV = VCOV,
                   hypotheses = list(hypothesis), comparison = "complement")
 
 
@@ -512,7 +508,7 @@ controls_mi <- semTools::runMI(controls, mice.imp, fun = "sem",
 
 lavaan.mi::standardizedSolution.mi(controls_mi)
 
-hypothesis_elements = c("h1a_", "h1b_", "h1c_", "ms1_big3", "ms1_big4")
+hypothesis_elements <-  c("h1a_", "h1b_", "h1c_", "ms1_big3", "ms1_big4")
 
 indices <- rep(NA, length(hypothesis_elements))
 
@@ -530,10 +526,9 @@ VCOV <- standardizedSolution.mi(controls_mi, return.vcov = TRUE, type = "def.std
 
 hypothesis <-  "h1a_ + h1b_ + h1c_ + ms1_big3 + ms1_big4 < 0"
 
-restriktor::goric(est, VCOV = VCOV,
+H1_controls <- restriktor::goric(est, VCOV = VCOV,
                   hypotheses = list(hypothesis), comparison = "complement")
 
-summary(fit_controls)
 
 
 # Test the hypotheses using GORICA
@@ -771,3 +766,4 @@ H2_BiG4 <- "h3.1direct + h2_big4 > 0"
 restriktor::goric(est, VCOV = VCOV,
                   hypotheses = list(
                     H2_BiG4 = H2_BiG4), comparison = "complement")
+
