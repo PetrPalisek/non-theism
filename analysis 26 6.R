@@ -10,6 +10,8 @@ library(fastDummies)
 library(Amelia)
 library(psych)
 
+source("https://raw.githubusercontent.com/PetrPalisek/gorica_helpers/main/extract_defined_params_lavaanmi.R")
+
 set.seed(3333)
 
 # Load data
@@ -417,12 +419,23 @@ base <- "
    BiG2 ~ BiG1 + h1a*MS1
    BiG3 ~ ar3*BiG2 + h1b*MS1 
    BiG4 ~ ar4*BiG3 + h1c*MS1 
-   
-   BiG2 ~*~ 1*BiG2
-   
 
+   
+   BiG2 | k*t1
+   BiG2 | l*t2
+
+   BiG3 | k*t1
+   BiG3 | l*t2
+   
+   BiG4 | k*t1
+   BiG4 | l*t2
 
 "
+
+base <- lavaan::sem(base, df, ordered = c("BiG1","BiG2", "BiG3", "BiG4"), meanstructure = T,
+                    estimator = "WLSMV", parameterization = "theta")
+
+summary(base, std = T)
 
 base_mi <- semTools::runMI(base, mice.imp, fun = "sem", ordered = c("BiG1","BiG2", "BiG3", "BiG4"), meanstructure = T,
                            estimator = "WLSMV", missing = "pairwise", parameterization = "theta",
@@ -501,6 +514,17 @@ ms1_big4 := h1b*ar4
 h1a_ := h1a
 h1b_ := h1b
 h1c_ := h1c
+
+   BiG1 | l*t1
+
+   BiG2 | k*t1
+   BiG2 | l*t2
+
+   BiG3 | k*t1
+   BiG3 | l*t2
+   
+   BiG4 | k*t1
+   BiG4 | l*t2
   
 "
 
@@ -532,140 +556,202 @@ H1_controls <- restriktor::goric(est, VCOV = VCOV,
                   hypotheses = list(hypothesis), comparison = "complement")
 
 
-# Test the hypotheses using GORICA
 
-## FULL LINEAR MODEL
+## Full ordinal (slightly cut)
 
-
-full_linear <- "
+full_ordinal <- "
    BiG1 ~ Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE + OtherE
    BiG2 ~ Male + BlackProt + Catholic + MainProt   + BlackE + LatinxE + OtherE
    BiG3 ~ Male + BlackProt + Catholic + MainProt + BlackE + LatinxE + OtherE
    BiG4 ~ Age + Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE  + OtherE +
    Inc3 + ParRit + College + HighSchool + PST
-
+ 
   
    BiG2 ~ BiG1 + h1a*MS1
-   BiG3 ~ ar3*BiG2 + h1b*MS1+ PR2 + CR2 + h2.1a*H2 + h2.2a*T2 
-   BiG4 ~ ar4*BiG3 + h1c*MS1 + h2.1b*H2 + h2.2b*T2 + h3.1b*PR3 + h3.2b*CR3 + h2.1d*H3
-   
+   BiG3 ~ ar3*BiG2 + h1b*MS1+ h2.1a*H2 +h2.2a*T2 + PR2 + CR2 
+   BiG4 ~ ar4*BiG3 + h1c*MS1 + h2.1b*H2 + h2.2b*T2 + h2.1d*H3 + h3.2b*PR3 +  h3.1b*CR3 
    eta_BiG =~ BiG1 + 1*BiG2 + 1*BiG3 + 1*BiG4
-
+ 
   # Misc
-
+ 
   MS1 ~ ParCollege + ParHighSchool + BlackE + LatinxE + OtherE
-  
   BlackProt ~ BlackE
   Catholic ~ LatinxE
   BlackProt + MainProt + Catholic ~ OtherE
-
+ 
   College + HighSchool ~ ParCollege + ParHighSchool + Age + MS1
-  
   Inc3 ~ MS1
   ParRit ~ ParCollege + ParHighSchool
-  
   # PR
- 
- PR2 ~ MS1
- PR3 ~  PR2 + MS1 + h3.1a*H2 + T2
- PR4 ~ PR3 + MS1
- 
- # CR
+PR3 ~  PR2 + h3.1a*H2 + T2
 
-  CR2 ~ MS1
-  CR3 ~ CR2 + MS1 + H2 + h3.2a*T2
-  CR4 ~ CR3 + MS1
+# CR
  
-  
+CR3 ~ CR2 + H2 + h3.2a*T2
+
     # H
-
-   H2 ~ ms1_h2*MS1
+ 
+   H2 ~ MS1
    H3 ~ arH*H2
    H4 ~ H3
-  
       # T
-
+ 
   T2 ~ MS1
-
-  
+ 
   
 ## MS1 -> BiG2 -> BiG3
-
+ 
 ms1_big3 := h1a*ar3
-
+ 
 ## MS1 -> BiG3 -> BiG4
-
+ 
 ms1_big4 := h1b*ar4
-
+ 
 ## H2 -> BiG3 -> BiG4
-
+ 
 h2_big4 := h2.1a*ar4
-
+ 
 ## T2 -> BiG3 -> BiG4
-
+ 
 t2_big4 := h2.2a*ar4
-
+ 
 ## H2 -> H3 -> BiG4
-
+ 
 h2_h3_big4 := arH*h2.1d
-
+ 
 h1a_ := h1a
 h1b_ := h1b
 h1c_ := h1c
-
-
+ 
+ 
 ## H2 -> PR3 -> BiG4
-
+ 
 h3.1indirect := h3.1a*h3.1b
 h3.1direct := h2.1b
-
+ 
 ## T2 -> CR3 -> BiG4
-
+ 
 h3.2indirect := h3.2a*h3.2b
-h3.2direct := h2.2b"
+h3.2direct := h2.2b
 
-str(df)
+   
+   BiG1 ~1
+   BiG2 ~1
+   BiG3 ~1
+   BiG4 ~1
+   
+   CR2 ~1
+   CR3 ~1
+   PR2 ~1
+   PR3 ~1
+   H2 ~1
+   H3 ~1
+   
+      BiG1 | l*t1
 
-df_ml <- df
+   BiG2 | k*t1
+   BiG2 | l*t2
 
-df_ml[,c("BiG1", "BiG2", "BiG3", "BiG4", "ParRit", "PR2", 
-   "PR3", "PR4", "CR2", "CR3", "CR4", "H2", "H3", "H4", "T2", "PST")] <- lapply(df_ml[,c("BiG1", "BiG2", "BiG3", "BiG4", "ParRit", "PR2", 
-            "PR3", "PR4", "CR2", "CR3", "CR4", "H2", "H3", "H4", "T2", "PST")], FUN = as.numeric)
+   BiG3 | k*t1
+   BiG3 | l*t2
+   
+   BiG4 | k*t1
+   BiG4 | l*t2
+   
+   PR2 | pr1*t1
+   PR2 | pr2*t2
+   PR2 | pr3*t3
+   PR2 | pr4*t4
+   PR2 | pr5*t5
+   PR2 | pr6*t6
+   
+   PR3 | pr1*t1
+   PR3 | pr2*t2
+   PR3 | pr3*t3
+   PR3 | pr4*t4
+   PR3 | pr5*t5
+   PR3 | pr6*t6
+   
+   PR4 | pr1*t1
+   PR4 | pr2*t2
+   PR4 | pr3*t3
+   PR4 | pr4*t4
+   PR4 | pr5*t5
+   PR4 | pr6*t6
+   
+   CR2 | cr1*t1
+   CR2 | cr2*t2
+   CR2 | cr3*t3
+   CR2 | cr4*t4
+   CR2 | cr5*t5
+   CR2 | cr6*t6
+   
+   CR3 | cr1*t1
+   CR3 | cr2*t2
+   CR3 | cr3*t3
+   CR3 | cr4*t4
+   CR3 | cr5*t5
+   CR3 | cr6*t6
+   
+   CR4 | cr1*t1
+   CR4 | cr2*t2
+   CR4 | cr3*t3
+   CR4 | cr4*t4
+   CR4 | cr5*t5
+   CR4 | cr6*t6
+   
+   H2 | hth1*t1
+   H2 | hth2*t2
+   H2 | hth3*t3
+   H2 | hth4*t4
+   
+   H3 | hth1*t1
+   H3 | hth2*t2
+   H3 | hth3*t3
+   H3 | hth4*t4
+   
+   H4 | hth1*t1
+   H4 | hth2*t2
+   H4 | hth3*t3
+   H4 | hth4*t4
+
+"
+
+detach("lavaan.mi", unload = TRUE)
+full_ordinal_fit <- semTools::runMI(full_ordinal, mice.imp, fun = "sem", estimator = "WLSMV", parameterization = "theta",
+                                    meanstructure = T, ordered = c("BiG1", "BiG2", "BiG3", "BiG4", "ParRit", "PR2", 
+                                                                   "PR3", "PR4", "CR2", "CR3", "CR4", "H2", "H3", "H4", "T2", "PST"),
+                                    auto.cov.y = T)
+lavaan.mi::standardizedSolution.mi(full_ordinal_fit)
 
 
-full_fit_linear <- sem(full_linear, df_ml, meanstructure = T, missing = "FIML", estimator = "MLR", parameterization = "theta")
-summary(full_fit_linear, std = T, fit = T)
+library(semTools)
 
-library(tidyverse)
-mice.imp_lin <- mice.imp
+part_ordinal_fit <- lavaan::mimic(model = full_ordinal, data = data.frame(mice.imp[1]), estimator = "WLSMV", parameterization = "theta",
+                                    meanstructure = T, ordered = c("BiG1", "BiG2", "BiG3", "BiG4", "ParRit", "PR2", 
+                                                                   "PR3", "PR4", "CR2", "CR3", "CR4", "H2", "H3", "H4", "T2", "PST"),
+                                control = list(iter.max = 10e5), auto.cov.y = T)
 
-# Loop over each dataframe in the list
-for (i in 1:length(mice.imp_lin)) {
-  # Convert specified columns to numeric
-  mice.imp_lin[[i]] <- mice.imp_lin[[i]] %>%
-    mutate_at(vars(BiG1, BiG2, BiG3, BiG4, ParRit, PR2, PR3, PR4, CR2, CR3, CR4, H2, H3, H4, T2, PST), as.numeric)
-}
+lavNames(lavaanify(full_ordinal), "ov.orphan")
 
+summary(part_ordinal_fit, fit = T, std = T)
 
-full_lin_mi <- semTools::runMI(full_linear, mice.imp_lin, fun = "sem", meanstructure = T,
-                               estimator = "MLR")
+library(lavaan.mi)
 
-hypothesis_elements <-  rownames(standardizedSolution.mi(full_lin_mi, return.vcov = TRUE, type = "def"))
+hypothesis_elements <-  rownames(lavaan.mi::standardizedSolution.mi(full_ordinal_fit, return.vcov = TRUE, type = "def"))
 
 indices <- rep(NA, length(hypothesis_elements))
 
 for (i in seq_along(hypothesis_elements)) {
   param <- hypothesis_elements[i]
-  indices[i] <- which(lavaan.mi::standardizedSolution.mi(full_lin_mi)[, 'label'] == param)
+  indices[i] <- which(lavaan.mi::standardizedSolution.mi(full_ordinal_fit)[, 'label'] == param)
 }
 
-est <- lavaan.mi::standardizedSolution.mi(full_lin_mi)[indices, 'est.std'] # estimates
+est <- lavaan.mi::standardizedSolution.mi(full_ordinal_fit)[indices, 'est.std'] # estimates
 
 names(est) <- hypothesis_elements
 
-VCOV <- standardizedSolution.mi(full_lin_mi, return.vcov = TRUE, type = "def.std.all")
-
-
+VCOV <- standardizedSolution.mi(full_ordinal_fit, return.vcov = TRUE, type = "def.std.all")
 
 # Hypothesis tests --------------------------------------------------------
 #H1
@@ -769,3 +855,340 @@ restriktor::goric(est, VCOV = VCOV,
                     H2_BiG4 = H2_BiG4), comparison = "complement")
 
 save.image("nontheism.RData")
+
+
+# Sensitivity checks ------------------------------------------------------
+
+full_fit_ofiml <- lavaan::sem(full_linear, df_ml, meanstructure = T, estimator = "MLR", missing = "fiml",
+                              fixed.x = F)
+
+
+summary(full_fit_ofiml, std = T, fit = T)
+
+hypothesis_elements <-  rownames(standardizedSolution.mi(full_ordinal_fit, return.vcov = TRUE, type = "def"))
+
+indices <- rep(NA, length(hypothesis_elements))
+
+for (i in seq_along(hypothesis_elements)) {
+  param <- hypothesis_elements[i]
+  indices[i] <- which(lavaan.mi::standardizedSolution.mi(full_ordinal_fit)[, 'label'] == param)
+}
+
+est <- lavaan.mi::standardizedSolution.mi(full_ordinal_fit)[indices, 'est.std'] # estimates
+
+names(est) <- hypothesis_elements
+
+VCOV <- standardizedSolution.mi(full_ordinal_fit, return.vcov = TRUE, type = "def.std.all")
+
+
+
+# MLE sensitivity-------------------------------------------------------------------------
+df_ml <- df
+
+
+df_ml[,c("BiG1", "BiG2", "BiG3", "BiG4", "ParRit", "PR2", 
+         "PR3", "PR4", "CR2", "CR3", "CR4", "H2", "H3", "H4", "T2", "PST")] <- lapply(df_ml[,c("BiG1", "BiG2", "BiG3", "BiG4", "ParRit", "PR2", 
+                                                                                               "PR3", "PR4", "CR2", "CR3", "CR4", "H2", "H3", "H4", "T2", "PST")], FUN = as.numeric)
+mice.imp_lin <- mice.imp
+
+mice.imp_lin <- lapply(mice.imp, function(df) {
+  df[,c("BiG1", "BiG2", "BiG3", "BiG4", "ParRit", "PR2", 
+        "PR3", "PR4", "CR2", "CR3", "CR4", "H2", "H3", "H4", "T2", "PST")] <- 
+    lapply(df[,c("BiG1", "BiG2", "BiG3", "BiG4", "ParRit", "PR2", 
+                 "PR3", "PR4", "CR2", "CR3", "CR4", "H2", "H3", "H4", "T2", "PST")], 
+           FUN = as.numeric)
+  return(df)
+})
+
+# Baseline ML model
+base_ml <- "
+  
+   BiG2 ~ BiG1 + h1a*MS1
+   BiG3 ~ ar3*BiG2 + h1b*MS1 
+   BiG4 ~ ar4*BiG3 + h1c*MS1 
+
+"
+
+base_mi_ml <- lavaan.mi::sem.mi(base_ml, mice.imp_lin, meanstructure = T,
+                           estimator = "MLR", missing = "fiml",
+                           constraints = "## MS1 -> BiG2 -> BiG3
+                             
+                             ms1_big3 := h1a*ar3
+                           
+                           ## MS1 -> BiG3 -> BiG4
+                           
+                           ms1_big4 := h1b*ar4
+                           
+                           h1a_ := h1a
+                           h1b_ := h1b
+                           h1c_ := h1c")
+
+
+
+base_mi_ml_params <- extract_defined_params_lavaanmi(base_mi_ml)
+
+hypothesis <-  "h1a_ + h1b_ + h1c_ + ms1_big3 + ms1_big4 < 0"
+
+H1_base <- restriktor::goric(base_mi_ml_params[["est"]], VCOV = base_mi_ml_params[["VCOV"]],
+                             hypotheses = list(hypothesis), comparison = "complement")
+H1_base
+
+H1_base_ben <- benchmark(H1_base)
+
+
+# Controls model ML
+
+controls_ml <- "
+   BiG1 ~ Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE + OtherE
+   BiG2 ~ Male + BlackProt + Catholic + MainProt   + BlackE + LatinxE + OtherE
+   BiG3 ~ Male + BlackProt + Catholic + MainProt + BlackE + LatinxE + OtherE
+   BiG4 ~ Age + Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE  + OtherE +
+   Inc3 + ParRit + College + HighSchool + PST
+
+  
+   BiG2 ~ BiG1 + h1a*MS1
+   BiG3 ~ ar3*BiG2 + h1b*MS1 
+   BiG4 ~ ar4*BiG3 + h1c*MS1 
+   
+   eta_BiG =~ BiG1 + 1*BiG2 + 1*BiG3 + 1*BiG4
+
+  # Misc
+
+  MS1 ~ ParCollege + ParHighSchool + BlackE + LatinxE + OtherE
+  
+  BlackProt ~ BlackE
+  Catholic ~ LatinxE
+  BlackProt + MainProt + Catholic ~ OtherE
+  College + HighSchool ~ ParCollege + ParHighSchool + Age + MS1
+  
+  Inc3 ~ MS1
+  ParRit ~ ParCollege + ParHighSchool
+  
+  ## MS1 -> BiG2 -> BiG3
+
+ms1_big3 := h1a*ar3
+
+## MS1 -> BiG3 -> BiG4
+
+ms1_big4 := h1b*ar4
+
+h1a_ := h1a
+h1b_ := h1b
+h1c_ := h1c
+
+  
+"
+
+controls_mi_ml <- lavaan.mi::sem.mi(controls_ml, mice.imp_lin, meanstructure = T,
+                                 estimator = "MLR", missing = "fiml")
+
+controls_mi_ml_params <- extract_defined_params_lavaanmi(controls_mi_ml)
+
+hypothesis <-  "h1a_ + h1b_ + h1c_ + ms1_big3 + ms1_big4 < 0"
+
+H1_controls <- restriktor::goric(controls_mi_ml_params[["est"]], VCOV = controls_mi_ml_params[["VCOV"]],
+                             hypotheses = list(hypothesis), comparison = "complement")
+H1_controls
+
+H1_controls_ben <- benchmark(H1_controls)
+
+# Full ML model
+
+# Test the hypotheses using GORICA
+
+## FULL LINEAR MODEL
+
+
+full_linear <- "
+   BiG1 ~ Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE + OtherE
+   BiG2 ~ Male + BlackProt + Catholic + MainProt   + BlackE + LatinxE + OtherE
+   BiG3 ~ Male + BlackProt + Catholic + MainProt + BlackE + LatinxE + OtherE
+   BiG4 ~ Age + Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE  + OtherE +
+   Inc3 + ParRit + College + HighSchool + PST
+
+  
+   BiG2 ~ BiG1 + h1a*MS1
+   BiG3 ~ ar3*BiG2 + h1b*MS1+ PR2 + CR2 + h2.1a*H2 + h2.2a*T2 
+   BiG4 ~ ar4*BiG3 + h1c*MS1 + h2.1b*H2 + h2.2b*T2 + h3.1b*PR3 + h3.2b*CR3 + h2.1d*H3
+   
+   eta_BiG =~ BiG1 + 1*BiG2 + 1*BiG3 + 1*BiG4
+
+  # Misc
+
+  MS1 ~ ParCollege + ParHighSchool + BlackE + LatinxE + OtherE
+  
+  BlackProt ~ BlackE
+  Catholic ~ LatinxE
+  BlackProt + MainProt + Catholic ~ OtherE
+
+  College + HighSchool ~ ParCollege + ParHighSchool + Age + MS1
+  
+  Inc3 ~ MS1
+  ParRit ~ ParCollege + ParHighSchool
+  
+  # PR
+ 
+ PR2 ~ MS1
+ PR3 ~  PR2 + MS1 + h3.1a*H2 + T2
+ PR4 ~ PR3 + MS1
+ 
+ # CR
+
+  CR2 ~ MS1
+  CR3 ~ CR2 + MS1 + H2 + h3.2a*T2
+  CR4 ~ CR3 + MS1
+ 
+  
+    # H
+
+   H2 ~ ms1_h2*MS1
+   H3 ~ arH*H2
+   H4 ~ H3
+  
+      # T
+
+  T2 ~ MS1
+
+  
+  
+## MS1 -> BiG2 -> BiG3
+
+ms1_big3 := h1a*ar3
+
+## MS1 -> BiG3 -> BiG4
+
+ms1_big4 := h1b*ar4
+
+## H2 -> BiG3 -> BiG4
+
+h2_big4 := h2.1a*ar4
+
+## T2 -> BiG3 -> BiG4
+
+t2_big4 := h2.2a*ar4
+
+## H2 -> H3 -> BiG4
+
+h2_h3_big4 := arH*h2.1d
+
+h1a_ := h1a
+h1b_ := h1b
+h1c_ := h1c
+
+
+## H2 -> PR3 -> BiG4
+
+h3.1indirect := h3.1a*h3.1b
+h3.1direct := h2.1b
+
+## T2 -> CR3 -> BiG4
+
+h3.2indirect := h3.2a*h3.2b
+h3.2direct := h2.2b"
+
+
+full_mi_ml <- lavaan.mi::sem.mi(full_linear, mice.imp_lin, meanstructure = T,
+                                estimator = "MLR", missing = "fiml")
+
+
+full_mi_ml_params <- extract_defined_params_lavaanmi(full_mi_ml)
+
+hypothesis <-  "h1a_ + h1b_ + h1c_ + ms1_big3 + ms1_big4 < 0"
+
+H1_full_ml <- restriktor::goric(full_mi_ml_params[["est"]], VCOV = full_mi_ml_params[["VCOV"]],
+                                 hypotheses = list(hypothesis), comparison = "complement")
+H1_full_ml
+
+H1_full_ml_ben <- benchmark(H1_full_ml)
+
+# H2.1: 
+# H2 -> BiG4
+# If H1+, then:
+
+H2.1 <- "h3.1direct + h2_big4 + h2_h3_big4 > 0"
+
+H2.1_eval <- restriktor::goric(full_mi_ml_params[["est"]], VCOV = full_mi_ml_params[["VCOV"]],
+                  hypotheses = list(
+                    H2.1), comparison = "complement")
+
+H2.1_eval_ben <- benchmark(H2.1_eval)
+# H2.2: 
+# T2 -> BiG4
+# If H1+, then:
+
+H2.2 <- "h3.2direct + t2_big4 < 0"
+
+H2.2_eval <- restriktor::goric(full_mi_ml_params[["est"]], VCOV = full_mi_ml_params[["VCOV"]],
+                  hypotheses = list(
+                    H2.2), comparison = "complement")
+
+H2.2_eval_ben <- benchmark(H2.2_eval)
+
+
+# Explanatory paths
+
+# H3.1: 
+# H2 -> PR3 -> BiG4
+
+# Is there any indirect effect?
+H3.1any <- "abs(h3.1indirect) > 0" 
+
+# First as complement
+
+H3.1_eval <- restriktor::goric(full_mi_ml_params[["est"]], VCOV = full_mi_ml_params[["VCOV"]],
+                  hypotheses = list(
+                    H3.1any = H3.1any), comparison = "complement")
+H3.1_eval_ben <- benchmark(H3.1_eval)
+
+# Is there partial mediation 
+H3.1part <- "abs(h3.1indirect) > 0 ; abs(h3.1direct) > 0"
+
+# Is there full mediation
+H3.1full <- "abs(h3.1indirect) > 0 ; abs(h3.1direct) = 0"
+
+H3.1full_eval <- restriktor::goric(full_mi_ml_params[["est"]], VCOV = full_mi_ml_params[["VCOV"]],
+                  hypotheses = list(
+                    H3.1part = H3.1part,
+                    H3.1full = H3.1full), comparison = "unconstrained")
+
+benchmark(H3.1full_eval)
+
+# If par. med supported, then:
+# Is there par. med with negative indirect eff?
+H3.1partneg <- "h3.1indirect > 0 ; abs(h3.1direct) > 0"
+
+H3.1part_eval <- restriktor::goric(full_mi_ml_params[["est"]], VCOV = full_mi_ml_params[["VCOV"]],
+                  hypotheses = list(
+                    H3.1partneg = H3.1partneg), comparison = "complement")
+
+benchmark(H3.1part_eval)
+
+# H3.2: 
+# T2 -> CR3 -> BiG4
+
+# Is there any indirect effect?
+H3.2any <- "abs(h3.2indirect) > 0"
+
+# First as complement
+
+H3.2eval <- restriktor::goric(full_mi_ml_params[["est"]], VCOV = full_mi_ml_params[["VCOV"]],
+                  hypotheses = list(
+                    H3.2any = H3.2any), comparison = "complement")
+
+benchmark(H3.2eval)
+
+# Is there partial mediation 
+H3.2part <- "abs(h3.2indirect) > 0 ; abs(h3.2direct) > 0"
+
+# Is there full mediation
+H3.2full <- "abs(h3.2indirect) > 0 ; abs(h3.2direct) = 0"
+
+
+H3.2part_eval <- restriktor::goric(full_mi_ml_params[["est"]], VCOV = full_mi_ml_params[["VCOV"]],
+                  hypotheses = list(H3.2part = H3.2part,
+                                    H3.2full = H3.2full), comparison = "unconstrained")
+H3.2full_eval <- restriktor::goric(full_mi_ml_params[["est"]], VCOV = full_mi_ml_params[["VCOV"]],
+                                   hypotheses = list(
+                                                     H3.2full = H3.2full), comparison = "complement")
+
+benchmark(H3.2full_eval)

@@ -1,1 +1,2 @@
 load("/Users/petrpalisek/non-theism/baseline.rds")
+load("/Users/petrpalisek/non-theism/nontheism.RData")
