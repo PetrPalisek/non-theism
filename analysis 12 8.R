@@ -559,11 +559,14 @@ benchmark(H1_controls)
 
 full_ordinal <- "
 
+PST_l =~ PST
+PST ~~ 0*PST
+
    BiG1 ~ Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE + OtherE
    BiG2 ~ Male + BlackProt + Catholic + MainProt   + BlackE + LatinxE + OtherE
    BiG3 ~ Male + BlackProt + Catholic + MainProt + BlackE + LatinxE + OtherE
    BiG4 ~ Age + Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE  + OtherE +
-   Inc3 + ParRit + College + HighSchool + PST
+   Inc3 + ParRit + College + HighSchool + PST_l
  
      eta_BiG =~ BiG1 + 1*BiG2 + 1*BiG3 + 1*BiG4
 
@@ -713,9 +716,11 @@ full_ordinal_fit <- lavaan.mi::sem.mi(full_ordinal, mice.imp,
                                       missing = "listwise",  control = list(iter.max = 10e5))
 
 s <- lavaan.mi::standardizedSolution.mi(full_ordinal_fit)
-fitmeasures(full_ordinal_fit)
+compareFit(base_mi, controls_mi, full_ordinal_fit)
 
-(15475.243-171)/171*
+standardizedSolution.mi(full_ordinal_fit, return.vcov = F, type = "cov.lv")
+
+sqrt((15475.243-171)/(171*1387))
 
 full_ordinal_prereg <- "
 PST_l =~ PST
