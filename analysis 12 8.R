@@ -1,3 +1,9 @@
+################################3###############################################3
+## The relationship between exogenous pressures and belief in God in young Americans
+################################################################################3
+
+
+# Load libraries
 library(lavaan)
 library(semTools)
 library(semPlot)
@@ -272,13 +278,13 @@ df <- cbind(df, dummies)
 
 table(df$RELTRAD_W1)
 
-# Deleting non-Christian participants 
+# Removing from analysis non-Christian participants 
 df <- df[!(df$RELTRAD_W1 %in% c("Jewish", "Other")),] 
 
-# Deleting unaffiliates with no Christian parent
+# Removing from analysis unaffiliates with no Christian parent
 df <- df[!(df$RELTRAD_W1 == "INDE" & df$BNPRLCAT_W1 == 0 & df$BNPRLPRT_W1 == 0),] 
 
-# Remove W1 non-believers
+# Removing from analysis W1 non-believers
 df <- df[df$GOD_W1 != "0",] 
 
 # Renaming vars to match preregistration
@@ -327,6 +333,7 @@ str(df)
 
 # Descriptives ------------------------------------------------------------
 
+# Check missing values
 Amelia::missmap(df, rank.order = F)
 
 na_sum <- data.frame(lapply(df, function(x) sum(is.na(x))))
@@ -355,24 +362,139 @@ psych::describe(df[,c("BiG1", "BiG2", "BiG3", "BiG4",
 table(df$focal_na)
 
 
-# Plots -------------------------------------------------------------------
+### Plot raw data_______________________________________________________________________________
 
-library(ggalluvial)
+# Create a subset of data for the plot
+df_plot <- subset(df, select = c(BiG1,BiG2,BiG3,BiG4,MS1, id))
+df_plot <- df_plot[!is.na(df_plot$MS1),]
 
-long_df <- df %>%
-  pivot_longer(cols = starts_with("BiG"), names_to = "TimePoint", values_to = "Belief") %>%
-  mutate(TimePoint = as.integer(gsub("BiG", "", TimePoint)),
-         Belief = ifelse(is.na(Belief), "NA", as.character(Belief)),
-         Belief = factor(Belief, ordered = TRUE, levels = c("NA", "0", ".5", "1")))
+# Cut data into 3 roughly equivalent groups based on material security
+df_plot$MS <- as.numeric(ggplot2::cut_number(df_plot$MS1,n = 3))
+df_plot <- subset(df_plot, select = -c(MS1))
 
-# Plot the data using stacked bar plot
-ggplot(long_df, aes(x = TimePoint, fill = Belief)) +
-  geom_bar(position = "stack", width = 0.7) +
-  labs(title = "Changes in Belief in God over Time",
-       x = "Time Point",
-       y = "Count",
-       fill = "Belief") +
-  theme_minimal()
+# Melt data into a long format
+df_plot <- data.table::melt(df_plot,id.vars = c("MS","id"), variable.name = "T")
+levels(df_plot$T) <- c("T1","T2","T3","T4")
+
+# Recode data for BiG
+df_plot$value[df_plot$value==1] <- "Yes"
+df_plot$value[df_plot$value==0.5] <- "Uncertain"
+df_plot$value[df_plot$value==0] <- "No"
+df_plot$value[is.na(df_plot$value)] <- "Missing"
+
+# Define colors
+col_vector = c(  '#E7298A','#9DD1D1', 'grey', 'purple')
+
+
+# Three subplots based on levels of material security
+p1 <- easyalluvial::alluvial_long(df_plot[df_plot$MS==1,]
+                                  , key = T
+                                  , value = value
+                                  , id = id
+                                  , verbose = F
+                                  ,   stratum_labels = T
+                                  , stratum_label_size = 3.5
+                                  , fill_by = 'value'
+                                  , NA_label = 'None'
+                                  , col_vector_value = col_vector
+                                  , col_vector_flow = col_vector
+) +
+  labs(title = 'Low material security') + 
+  scale_x_discrete(name = "", labels = c("Wave1", "Wave2","Wave3","Wave4"),expand = c(0.05,0.05)) + 
+  scale_y_continuous(name = "Count", breaks = seq(0,1000,200),
+                     limits = c(0,1100)) + 
+  theme_bw()  +
+  theme(
+    #panel.border = element_blank(),
+    # panel.grid.major = element_blank(),
+    #panel.grid.minor = element_blank(),
+    plot.title = element_text(hjust = 0.5, size = rel(2)),
+    axis.line = element_line(colour = "black"),
+    legend.position = "top",
+    legend.justification = c("right", "top"),
+    legend.text = element_text(size = rel(1.5)),
+    legend.title = element_text(size = rel(1.5)),
+    legend.key.size = unit(0.8, "cm"),
+    axis.title = element_text(size = rel(1.5)),
+    axis.text= element_text(size = rel(1.5)),
+    plot.margin=unit(c(0.4,0.4,-1,0.4),"cm"),
+    strip.text.x = element_text(size = rel(2)))
+
+
+
+p2 <- easyalluvial::alluvial_long(df_plot[df_plot$MS==2,]
+                                  , key = T
+                                  , value = value
+                                  , id = id
+                                  , stratum_label_size = 3.5
+                                  , fill_by = 'value'
+                                  , NA_label = 'None'
+                                  , col_vector_value = col_vector
+                                  , col_vector_flow = col_vector
+) +
+  labs(title = 'Medium material security') +
+  scale_x_discrete(name = "", labels = c("Wave1", "Wave2","Wave3","Wave4"),expand = c(0.05,0.05)) + 
+  scale_y_continuous(name = "Count", breaks = seq(0,1000,200),
+                     limits = c(0,1100)) + 
+  theme_bw()   +
+  theme(
+    #panel.border = element_blank(),
+    # panel.grid.major = element_blank(),
+    #panel.grid.minor = element_blank(),
+    plot.title = element_text(hjust = 0.5, size = rel(2)),
+    axis.line = element_line(colour = "black"),
+    legend.position = "top",
+    legend.justification = c("right", "top"),
+    legend.text = element_text(size = rel(1.5)),
+    legend.title = element_text(size = rel(1.5)),
+    legend.key.size = unit(0.8, "cm"),
+    axis.title = element_text(size = rel(1.5)),
+    axis.text= element_text(size = rel(1.5)),
+    plot.margin=unit(c(0.4,0.4,-1,0.4),"cm"),
+    strip.text.x = element_text(size = rel(2)))
+
+
+p3 <- easyalluvial::alluvial_long(df_plot[df_plot$MS==3,]
+                                  , key = T
+                                  , value = value
+                                  , id = id
+                                  , stratum_label_size = 3.5
+                                  , fill_by = 'value'
+                                  , NA_label = 'None'
+                                  , col_vector_value = col_vector
+                                  , col_vector_flow = col_vector
+) +
+  labs(title = 'High material security') + 
+  scale_x_discrete(name = "", labels = c("Wave1", "Wave2","Wave3","Wave4"),expand = c(0.05,0.05)) + 
+  scale_y_continuous(name = "Count", breaks = seq(0,1000,200),
+                     limits = c(0,1100)) + 
+  theme_bw()  +
+  theme(
+    #panel.border = element_blank(),
+    #panel.grid.major = element_blank(),
+    #panel.grid.minor = element_blank(),
+    plot.title = element_text(hjust = 0.5, size = rel(2)),
+    axis.line = element_line(colour = "black"),
+    legend.position = "top",
+    legend.justification = c("right", "top"),
+    legend.text = element_text(size = rel(1.5)),
+    legend.title = element_text(size = rel(1.5)),
+    legend.key.size = unit(0.8, "cm"),
+    axis.title = element_text(size = rel(1.5)),
+    axis.text= element_text(size = rel(1.5)),
+    plot.margin=unit(c(0.4,0.4,-1,0.4),"cm"),
+    strip.text.x = element_text(size = rel(2)))
+
+# Arrange subplots into the final plot and save
+gx <- ggpubr::ggarrange(p1, p2, p3, ncol=1, nrow = 3, 
+                        labels = c('A.', 'B.', 'C.'),
+                        font.label = list(size = 18, face = "bold", color ="black"),
+                        common.legend = T)
+
+gx
+
+ggplot2::ggsave("Alluvial_plot.png", plot = gx, width = 12, height = 16,
+                dpi = 600)
 
 
 
@@ -382,7 +504,8 @@ ggplot(long_df, aes(x = TimePoint, fill = Belief)) +
 # Number of imputed df 
 N.Imp <-  50
 
-# Create a column that contain the appropreate model for each variable - this only works if the variable is of the correct data type in the first place 
+# Create a column that contain the appropriate model for each variable
+# - this only works if the variable is of the correct data type in the first place 
 names(df)
 
 type <- c("", "", "", "", "","pmm", "polr",
@@ -412,10 +535,9 @@ for(i in 1:N.Imp) {
 }
 
 
+# Models --------------------------------------------------------
 
-#M: I am thinking about plotting the overall trends in beliefs across waves, can explain in person
-# a plot that would be nicely descriptive and would give a lot of information about the demographics and missingess
-
+## Baseline --------------------------------------------------- 
 
 base <- "
 
@@ -457,14 +579,17 @@ h1c_ := h1c"
 
 
 
-summary(base, std = T)
-
 base_mi <- lavaan.mi::sem.mi(base, mice.imp, ordered = c("BiG1","BiG2", "BiG3", "BiG4"), meanstructure = T,
                            estimator = "WLSMV", 
                            missing = "pairwise", 
                            parameterization = "theta", std.lv = T)
 
 fitmeasures(base_mi)
+
+summary(base_mi, std = T, fit = T)
+
+standardizedSolution.mi(base_mi)
+
 
 base_mi_params <- extract_defined_params_lavaanmi(base_mi)
 
@@ -476,7 +601,7 @@ H1_base <- restriktor::goric(base_mi_params[["est"]], VCOV = base_mi_params[["VC
 benchmark(H1_base)
 
 
-### Controls model
+## Controls ---------------------------------------------------
 
 controls <- "
    BiG1 ~ Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE + OtherE
@@ -541,9 +666,15 @@ controls_mi <- lavaan.mi::sem.mi(controls, mice.imp,
                                estimator = "WLSMV", missing = "pairwise", 
                                parameterization = "theta", std.lv = T)
 
+summary(controls_mi, std = T, fit = T)
+
+standardizedSolution.mi(controls_mi)
+
+
 fitmeasures(controls_mi)
 
 controls_mi_params <- extract_defined_params_lavaanmi(controls_mi)
+
 
 
 hypothesis <-  "h1a_ + h1b_ + h1c_ + ms1_big3 + ms1_big4 < 0"
@@ -554,8 +685,7 @@ H1_controls <- restriktor::goric(controls_mi_params[["est"]], VCOV = controls_mi
 benchmark(H1_controls)
 
 
-## Full ordinal (slightly cut)
-
+## Full ordinal (slightly cut) ---------------------------------------------------
 
 full_ordinal <- "
 
@@ -715,12 +845,21 @@ full_ordinal_fit <- lavaan.mi::sem.mi(full_ordinal, mice.imp,
                                                                      "PR3", "CR2", "CR3", "H2", "H3", "T2", "PST"),
                                       missing = "listwise",  control = list(iter.max = 10e5))
 
+summary(full_ordinal_fit, std = T, fit = T)
+
+standardizedSolution.mi(full_ordinal_fit)
+
+
 s <- lavaan.mi::standardizedSolution.mi(full_ordinal_fit)
 compareFit(base_mi, controls_mi, full_ordinal_fit)
 
 standardizedSolution.mi(full_ordinal_fit, return.vcov = F, type = "cov.lv")
 
 sqrt((15475.243-171)/(171*1387))
+
+
+## Full ordinal (preregistered) ---------------------------------------------------
+
 
 full_ordinal_prereg <- "
 PST_l =~ PST
