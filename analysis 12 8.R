@@ -377,10 +377,11 @@ df_plot <- data.table::melt(df_plot,id.vars = c("MS","id"), variable.name = "T")
 levels(df_plot$T) <- c("T1","T2","T3","T4")
 
 # Recode data for BiG
-df_plot$value[df_plot$value==1] <- "Yes"
-df_plot$value[df_plot$value==0.5] <- "Uncertain"
-df_plot$value[df_plot$value==0] <- "No"
 df_plot$value[is.na(df_plot$value)] <- "Missing"
+df_plot$value[df_plot$value==1] <- "Yes"
+df_plot$value[df_plot$value==.5] <- "Uncertain"
+df_plot$value[df_plot$value==0] <- "No"
+
 
 # Define colors
 col_vector = c(  '#E7298A','#9DD1D1', 'grey', 'purple')
