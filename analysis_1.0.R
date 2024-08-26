@@ -388,7 +388,7 @@ levels(df_plot$T) <- c("T1","T2","T3","T4")
 # Recode data for BiG
 df_plot$value[is.na(df_plot$value)] <- "Missing"
 df_plot$value[df_plot$value==1] <- "Yes"
-df_plot$value[df_plot$value==.5] <- "Uncertain"
+df_plot$value[df_plot$value==".5"] <- "Uncertain"
 df_plot$value[df_plot$value==0] <- "No"
 
 
@@ -511,6 +511,32 @@ ggplot2::ggsave("Alluvial_plot.png", plot = gx, width = 12, height = 16,
 
 
 dfSummary(df)
+
+
+# Reasons for missing
+
+# % if missing non-believers from Wave 2 to 3
+idsT2 <- df_plot$id[df_plot$MS==1 & df_plot$T == "T2" & df_plot$value == "No"]
+length(df_plot$id[df_plot$id %in% idsT2 & df_plot$T == "T3"& df_plot$value == "Missing"])/length(idsT2)
+
+# % if missing non-believers from Wave 3 to 5
+idsT2 <- df_plot$id[df_plot$MS==1 & df_plot$T == "T3" & df_plot$value == "No"]
+length(df_plot$id[df_plot$id %in% idsT2 & df_plot$T == "T4"& df_plot$value == "Missing"])/length(idsT2)
+
+
+
+# Raw counts of change in belief
+
+# % of believers who lost their belief in low material security
+idsT2 <- df_plot$id[df_plot$MS==1 & df_plot$T == "T1"]
+length(df_plot$id[df_plot$id %in% idsT2 & df_plot$T == "T4"& df_plot$value == "No"])/length(idsT2 -
+length(df_plot$id[df_plot$id %in% idsT2 & df_plot$T == "T4"& df_plot$value == "Missing"]))
+
+# % of believers who lost their belief in high material security
+idsT2 <- df_plot$id[df_plot$MS==3 & df_plot$T == "T1"]
+length(df_plot$id[df_plot$id %in% idsT2 & df_plot$T == "T4"& df_plot$value == "No"])/length(idsT2 -
+length(df_plot$id[df_plot$id %in% idsT2 & df_plot$T == "T4"& df_plot$value == "Missing"]))
+
 
 
 # Imputation --------------------------------------------------------------
@@ -647,7 +673,6 @@ base_mi <- lavaan.mi::sem.mi(base, mice.imp, ordered = c("BiG1","BiG2", "BiG3", 
                            parameterization = "theta", std.lv = T)
 
 fitmeasures(base_mi)
-
 
 
 
