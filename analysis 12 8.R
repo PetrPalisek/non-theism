@@ -1168,8 +1168,6 @@ fitmeasures(full_ordinal_fit)
 s <- lavaan.mi::standardizedSolution.mi(full_ordinal_fit) 
 
 
-standardizedSolution.mi(full_ordinal_fit, return.vcov = F, type = "cov.lv")
-
 sqrt((13261.76-190)/(190*1386))
 
 
