@@ -660,6 +660,12 @@ H1_base <- restriktor::goric(base_mi_params[["est"]], VCOV = base_mi_params[["VC
 
 benchmark(H1_base)
 
+b <- standardizedSolution.mi(base_mi)
+b[,5:10] <-  b[,5:10] %>% round(3)
+b %>% filter(op == "~") %>% filter(grepl("BiG", lhs)) %>% filter(grepl("BiG", rhs))
+b %>% filter(op == "~") %>% filter(grepl("BiG", lhs)) %>% filter(grepl("MS", rhs))
+
+
 
 ## Controls ---------------------------------------------------
 
@@ -793,6 +799,11 @@ controls_mi <- lavaan.mi::sem.mi(controls, mice.imp,
 
 
 fitmeasures(controls_mi)
+
+c <- standardizedSolution.mi(controls_mi)
+c[,5:10] <-  c[,5:10] %>% round(3)
+c %>% filter(op == "~") %>% filter(grepl("BiG", lhs)) %>% filter(grepl("BiG", rhs))
+c %>% filter(op == "~") %>% filter(grepl("BiG", lhs)) %>% filter(grepl("MS", rhs))
 
 controls_mi_params <- extract_defined_params_lavaanmi(controls_mi)
 
@@ -975,6 +986,8 @@ full_ordinal_fit <- lavaan.mi::sem.mi(full_ordinal, mice.imp,
                                       meanstructure = T, ordered = c("BiG1", "BiG2", "BiG3", "BiG4", "ParRit", "PR2", 
                                                                      "PR3", "CR2", "CR3", "H2", "H3", "T2", "PST"),
                                       missing = "listwise",  control = list(iter.max = 10e5))
+
+fitmeasures(full_ordinal_fit)
 
 s <- standardizedSolution.mi(full_ordinal_fit) %>% data.frame() 
 s[,5:10] <-  s[,5:10] %>% round(3)
@@ -1166,6 +1179,8 @@ standardizedSolution.mi(full_ordinal_fit) %>% data.frame() %>% filter(op == ":="
 fitmeasures(full_ordinal_fit)
 
 s <- lavaan.mi::standardizedSolution.mi(full_ordinal_fit) 
+
+xlsx::write.xlsx2(s %>% data.frame(), "params.xlsx")
 
 
 sqrt((13261.76-190)/(190*1386))
