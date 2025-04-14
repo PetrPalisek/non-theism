@@ -4089,7 +4089,7 @@ reviewer_model <- "
    BiG4 ~ Age + Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE  + OtherE +
    Inc3 + ParRit + College + AAVOC + PST
  
-   BiG4 ~ ar4*BiG3 + h1c*MS1 + h2.1b*H2 + h2.2b*T2 + h2.1d*H3 + h3.2b*PR3 +  h3.1b*CR3 
+   BiG4 ~ h1c*MS1 + h2.1b*H2 + h2.2b*T2 + h2.1d*H3 + h3.2b*PR3_l +  h3.1b*CR3_l 
 
   # Misc
  
@@ -4107,14 +4107,20 @@ reviewer_model <- "
 
 PR2_l =~ PR2
 PR2 ~~ 0*PR2
+
+PR3_l =~ PR3
+PR3 ~~ 0*PR3
   
-PR3 ~  PR2_l + h3.1a*H2 + T2
+PR3_l ~  PR2_l + h3.1a*H2 + T2
 
 # CR
 CR2_l =~ CR2
 CR2 ~~ 0*CR2
 
-CR3 ~ CR2_l + H2 + h3.2a*T2
+CR3_l =~ CR3
+CR3 ~~ 0*CR3
+
+CR3_l ~ CR2_l + H2 + h3.2a*T2
 
 
 
@@ -4146,67 +4152,15 @@ h3.1direct := h2.1b
 h3.2indirect := h3.2a*h3.2b
 h3.2direct := h2.2b
 
-
-    
-
-   PR2 | pr1*t1
-   PR2 | pr2*t2
-   PR2 | pr3*t3
-   PR2 | pr4*t4
-   PR2 | pr5*t5
-   PR2 | pr6*t6
-   
-   PR3 | pr1*t1
-   PR3 | pr2*t2
-   PR3 | pr3*t3
-   PR3 | pr4*t4
-   PR3 | pr5*t5
-   PR3 | pr6*t6
-
-   
-   CR2 | cr1*t1
-   CR2 | cr2*t2
-   CR2 | cr3*t3
-   CR2 | cr4*t4
-   CR2 | cr5*t5
-   CR2 | cr6*t6
-   
-   CR3 | cr1*t1
-   CR3 | cr2*t2
-   CR3 | cr3*t3
-   CR3 | cr4*t4
-   CR3 | cr5*t5
-   CR3 | cr6*t6
-
-   
-   H2 | hth1*t1
-   H2 | hth2*t2
-   H2 | hth3*t3
-   H2 | hth4*t4
-   
-   H3 | hth1*t1
-   H3 | hth2*t2
-   H3 | hth3*t3
-   H3 | hth4*t4
-   
-
-   
-   PR2 ~ 0*1
-   PR3 ~ NA*1
-   
-   CR2 ~ 0*1
-   CR3 ~ NA*1
-   
-   H2 ~ 0*1
-   H3 ~ NA*1
+  
 "
 
-rev_fit <- lavaan.mi::sem.mi(full_ordinal, mice.imp, 
+rev_fit <- lavaan.mi::sem.mi(reviewer_model, mice.imp, 
                                       estimator = "WLSMV", parameterization = "theta",
-                                      meanstructure = T, ordered = c("BiG1", "BiG2", "BiG3", "BiG4", "ParRit", "PR2", 
+                                      meanstructure = T, ordered = c("BiG4", "ParRit", "PR2", 
                                                                      "PR3", "CR2", "CR3", "H2", "H3", "T2"),
                                       missing = "pairwise")
-
+summary(rev_fit)
 fitmeasures(rev_fit)
 
 r <- standardizedSolution.mi(rev_fit) %>% data.frame() 
