@@ -18,6 +18,7 @@ library(psych)
 library(lavaan.mi)
 library(summarytools)
 library(dplyr)
+library(mice)
 
 source("https://raw.githubusercontent.com/PetrPalisek/gorica_helpers/main/extract_defined_params_lavaanmi.R")
 source("https://raw.githubusercontent.com/PetrPalisek/gorica_helpers/main/extract_defined_params_lavaan.R")
@@ -365,7 +366,7 @@ ggplot(df, aes(x = BiG_NA_Wave, y = MS1)) +
   theme_minimal() +
   theme(strip.text = element_text(size = 12))
 
-#df <- df[df$BiG1 != "0",] 
+df <- df[df$BiG1 != "0",] 
 
 
 # Descriptives ------------------------------------------------------------
@@ -404,6 +405,13 @@ psych::describe(df[,c("BiG1", "BiG2", "BiG3", "BiG4",
 
 table(df$focal_na)
 
+df_pre$BiG4NA <- ifelse(is.na(df_pre$BiG4), 1, 0)
+df_pre$BiG1 <- factor(df_pre$BiG1,ordered = F)
+na_fit <- glm(BiG4NA ~ BiG1*MS1, df_pre, family = binomial(link = "logit"))
+
+effects::allEffects(na_fit)
+
+summary(na_fit)
 
 ### Plot raw data_______________________________________________________________________________
 
@@ -552,7 +560,6 @@ dfSummary(df)
 
 
 # Imputation --------------------------------------------------------------
-
 
 # Number of imputed df 
 N.Imp <-  70
@@ -746,7 +753,7 @@ library(purrr)     # for iterating over imputations
 lm_fit <- with(df_imp, lm(as.numeric(BiG4) ~ as.numeric(MS1) + BlackE + LatinxE + OtherE + ParEd_ord))
 
 # Pool the results automatically using Rubin's rules
-pooled_lm <- pool(lm_fit)
+pooled_lm <- mice::pool(lm_fit)
 summary(pooled_lm)
 
 # With BiG stability:
@@ -983,6 +990,8 @@ base_mi <- lavaan.mi::sem.mi(base, mice.imp, ordered = c("BiG1","BiG2", "BiG3", 
                              parameterization = "theta", std.lv = T)
 
 standardizedSolution.mi(base_mi) %>% data.frame() %>% filter(op == ":=")
+standardizedSolution.mi(base_mi) %>% data.frame() %>% filter(op == "~") %>% filter(grepl("BiG", lhs)) %>% filter(grepl("BiG", rhs))
+standardizedSolution.mi(base_mi) %>% data.frame() %>% filter(op == "~") %>% filter(grepl("BiG", lhs)) %>% filter(grepl("MS", rhs))
 
 fitmeasures(base_mi)
 
@@ -1115,6 +1124,32 @@ controls_mi <- lavaan.mi::sem.mi(controls, mice.imp,
                                  parameterization = "theta", std.lv = T)
 
 standardizedSolution.mi(controls_mi) %>% data.frame() %>% filter(op == ":=")
+fitmeasures(controls_mi)
+
+estimate_sample_size_from_rmsea <- function(fit) {
+  # Get fit measures
+  fit_measures <- fitMeasures(fit)
+  
+  # Extract required values
+  chisq <- fit_measures["chisq"]
+  df <- fit_measures["df"]
+  rmsea <- fit_measures["rmsea"]
+  
+  # Basic checks
+  if (is.na(rmsea) || is.na(chisq) || is.na(df) || df == 0 || rmsea == 0) {
+    stop("Invalid values in fit measures: RMSEA, df, or chi-square might be missing or zero.")
+  }
+  
+  # Compute estimated sample size
+  N_estimated <- (chisq - df) / (rmsea^2 * df) + 1
+  
+  return(N_estimated)
+}
+
+
+estimate_sample_size_from_rmsea(controls_mi)
+
+sqrt ( ( 1029.662-66)/(66*2872) )
 
 controls <- "
    BiG1 ~ Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE + OtherE
@@ -1199,14 +1234,17 @@ benchmark(H1_controls)
 
 ## Full ordinal (slightly cut) ---------------------------------------------------
 
+
 full_ordinal <- "
 
+PST_l =~ PST
+PST ~~ 0*PST
 
    BiG1 ~ Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE + OtherE
    BiG2 ~ Male + BlackProt + Catholic + MainProt   + BlackE + LatinxE + OtherE
    BiG3 ~ Male + BlackProt + Catholic + MainProt + BlackE + LatinxE + OtherE
    BiG4 ~ Age + Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE  + OtherE +
-   Inc3 + ParRit + College + AAVOC + PST
+   Inc3 + ParRit + College + AAVOC + PST_l
  
      eta_BiG =~ BiG1 + 1*BiG2 + 1*BiG3 + 1*BiG4
 
@@ -1356,17 +1394,18 @@ h3.2direct := h2.2b
    H2 ~ 0*1
    H3 ~ NA*1
    
-  sumH1 := h1a_ + h1b_ + h1c_ + ms1_big3 + ms1_big4
+     sumH1 := h1a_ + h1b_ + h1c_ + ms1_big3 + ms1_big4
   sumH2_1 := h3.1direct + h2_big4 + h2_h3_big4
   sumH2_2 := h3.2direct + t2_big4
-"
+   "
 
 full_ordinal_fit <- lavaan.mi::sem.mi(full_ordinal, mice.imp, 
                                       estimator = "WLSMV", parameterization = "theta",
                                       meanstructure = T, ordered = c("BiG1", "BiG2", "BiG3", "BiG4", "ParRit", "PR2", 
-                                                                     "PR3", "CR2", "CR3", "H2", "H3", "T2"),
-                                      missing = "pairwise")
+                                                                     "PR3", "CR2", "CR3", "H2", "H3", "T2", "PST"),
+                                      missing = "pairwise",  control = list(iter.max = 10e5))
 
+summary(full_ordinal_fit)
 fitmeasures(full_ordinal_fit)
 
 s <- standardizedSolution.mi(full_ordinal_fit) %>% data.frame() 
@@ -1386,14 +1425,22 @@ s %>% filter(op == ":=")
 
 
 
+
+estimate_sample_size_from_rmsea(full_ordinal_fit)
+
+sqrt ( (  3272.156  -190)/(190*2872) )
+
+
 full_ordinal <- "
 
+PST_l =~ PST
+PST ~~ 0*PST
 
    BiG1 ~ Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE + OtherE
    BiG2 ~ Male + BlackProt + Catholic + MainProt   + BlackE + LatinxE + OtherE
    BiG3 ~ Male + BlackProt + Catholic + MainProt + BlackE + LatinxE + OtherE
    BiG4 ~ Age + Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE  + OtherE +
-   Inc3 + ParRit + College + AAVOC + PST
+   Inc3 + ParRit + College + AAVOC + PST_l
  
      eta_BiG =~ BiG1 + 1*BiG2 + 1*BiG3 + 1*BiG4
 
@@ -1542,12 +1589,14 @@ h3.2direct := h2.2b
    
    H2 ~ 0*1
    H3 ~ NA*1
+   
+
    "
 
 full_ordinal_fit <- lavaan.mi::sem.mi(full_ordinal, mice.imp, 
                                       estimator = "WLSMV", parameterization = "theta",
                                       meanstructure = T, ordered = c("BiG1", "BiG2", "BiG3", "BiG4", "ParRit", "PR2", 
-                                                                     "PR3", "CR2", "CR3", "H2", "H3", "T2"),
+                                                                     "PR3", "CR2", "CR3", "H2", "H3", "T2", "PST"),
                                       missing = "pairwise",  control = list(iter.max = 10e5))
 
 
@@ -2459,109 +2508,6 @@ H3.2full_eval <- restriktor::goric(full_ordinal_pw_params[["est"]], VCOV = full_
 H3.2full_eval_ben <- benchmark(H3.2full_eval)
 
 
-## 1.A. Extract for ML estimates (using lavaan.mi)
-baseline_val_ml <- H1_base_ml$result$gorica.weights[1]
-baseline_low_ml <- H1_base_ml$result$conf.low[1]
-baseline_high_ml <- H1_base_ml$result$conf.high[1]
-
-controls_val_ml <- H1_controls_ml$result$gorica.weights[1]
-controls_low_ml <- H1_controls_ml$result$conf.low[1]
-controls_high_ml <- H1_controls_ml$result$conf.high[1]
-
-full_val_ml <- full_mi_eval$result$gorica.weights[1]
-full_low_ml <- full_mi_eval$result$conf.low[1]
-full_high_ml <- full_mi_eval$result$conf.high[1]
-
-## 1.B. Extract for FIML estimates (using lavaan)
-baseline_val_fiml <- H1_base_fiml$result$gorica.weights[1]
-baseline_low_fiml <- H1_base_fiml$result$conf.low[1]
-baseline_high_fiml <- H1_base_fiml$result$conf.high[1]
-
-controls_val_fiml <- H1_controls_fiml$result$gorica.weights[1]
-controls_low_fiml <- H1_controls_fiml$result$conf.low[1]
-controls_high_fiml <- H1_controls_fiml$result$conf.high[1]
-
-full_val_fiml <- full_fiml_eval$result$gorica.weights[1]
-full_low_fiml <- full_fiml_eval$result$conf.low[1]
-full_high_fiml <- full_fiml_eval$result$conf.high[1]
-
-## 1.C. Extract for Ordinal estimates (using lavaan, WLSMV)
-baseline_val_ord <- H1_base_pw$result$gorica.weights[1]
-baseline_low_ord <- H1_base_pw$result$conf.low[1]
-baseline_high_ord <- H1_base_pw$result$conf.high[1]
-
-controls_val_ord <- H1_controls_pw$result$gorica.weights[1]
-controls_low_ord <- H1_controls_pw$result$conf.low[1]
-controls_high_ord <- H1_controls_pw$result$conf.high[1]
-
-full_val_ord <- full_ordinal_pw_ord$result$gorica.weights[1]
-full_low_ord <- full_ordinal_pw_ord$result$conf.low[1]
-full_high_ord <- full_ordinal_pw_ord$result$conf.high[1]
-
-full_val_ord_mi <- full_ordinal_mi_eval$result$gorica.weights[1]
-full_low_ord_mi <- full_ordinal_mi_eval$result$conf.low[1]
-full_high_ord_mi <- full_ordinal_mi_eval$result$conf.high[1]
-
-# Create a data frame for the WLSMV (lavaan.mi) models
-sensitivity_df_final <- data.frame(
-  Model = factor(c("Baseline", "Controls", "Full"),
-                 levels = c("Baseline", "Controls", "Full")),
-  EstimationMethod = "WLSMV (imputed)",
-  GORICA = c(full_val_ord_mi, full_low_ord_mi, full_high_ord_mi)
-)
-
-# Create a data frame for the ML (lavaan.mi) models
-sensitivity_df_ml <- data.frame(
-  Model = factor(c("Baseline", "Controls", "Full"),
-                 levels = c("Baseline", "Controls", "Full")),
-  EstimationMethod = "ML (imputed)",
-  GORICA = c(baseline_val_ml, controls_val_ml, full_val_ml)
-)
-
-# Create a data frame for the FIML models (using lavaan)
-sensitivity_df_fiml <- data.frame(
-  Model = factor(c("Baseline", "Controls", "Full"),
-                 levels = c("Baseline", "Controls", "Full")),
-  EstimationMethod = "FIML",
-  GORICA = c(baseline_val_fiml, controls_val_fiml, full_val_fiml)
-)
-
-# Create a data frame for the Ordinal models (using lavaan, WLSMV)
-sensitivity_df_ord <- data.frame(
-  Model = factor(c("Baseline", "Controls", "Full"),
-                 levels = c("Baseline", "Controls", "Full")),
-  EstimationMethod = "WLSMV (pairwise)",
-  GORICA = c(baseline_val_ord, controls_val_ord, full_val_ord)
-)
-
-# Combine all into one data frame
-sensitivity_df <- rbind(sensitivity_df_final, sensitivity_df_ml, 
-                        sensitivity_df_fiml, sensitivity_df_ord)
-
-# (Optional) Inspect the data frame
-print(sensitivity_df)
-
-##############################################
-# 3. Create the Plot with ggplot2
-##############################################
-sensitivity_df$gw <- sensitivity_df$GORICA
-# Create the plot: X-axis = Model Specification, Color = Estimation Method,
-# Points represent GORICA benchmark values with error bars for the 95% confidence bands.
- ggplot(sensitivity_df, aes(x = Model, y = gw, color = EstimationMethod, group = EstimationMethod)) +
-  geom_point()+
-  geom_line()+
-  labs(
-    title = "Sensitivity Analysis for H1",
-    x = "Model Specification",
-    y = "GORICA Weights for H1",
-    color = "Estimation Method"
-  ) +
-  theme_minimal() +
-  theme(
-    plot.title = element_text(hjust = 0.5, size = 14),
-    axis.text = element_text(size = 12),
-    axis.title = element_text(size = 12)
-  )
 
 
 # Nested models -----------------------------------------------------------
@@ -4089,7 +4035,7 @@ reviewer_model <- "
    BiG4 ~ Age + Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE  + OtherE +
    Inc3 + ParRit + College + AAVOC + PST
  
-   BiG4 ~ h1c*MS1 + h2.1b*H2 + h2.2b*T2 + h2.1d*H3 + h3.2b*PR3_l +  h3.1b*CR3_l 
+   BiG4 ~ h1c*MS1 + h2.1b*H2 + h2.2b*T2 + h3.2b*PR3_l +  h3.1b*CR3_l 
 
   # Misc
  
@@ -4122,23 +4068,17 @@ CR3 ~~ 0*CR3
 
 CR3_l ~ CR2_l + H2 + h3.2a*T2
 
-
-
-
     # H
  
    H2 ~ MS1
    H3 ~ arH*H2
+   
       # T
- 
   T2 ~ MS1
- 
- 
-  
  
 ## H2 -> H3 -> BiG4
  
-h2_h3_big4 := arH*h2.1d
+
  
  
  
@@ -4160,7 +4100,7 @@ rev_fit <- lavaan.mi::sem.mi(reviewer_model, mice.imp,
                                       meanstructure = T, ordered = c("BiG4", "ParRit", "PR2", 
                                                                      "PR3", "CR2", "CR3", "H2", "H3", "T2"),
                                       missing = "pairwise")
-summary(rev_fit)
+summary(rev_fit, std = T)
 fitmeasures(rev_fit)
 
 r <- standardizedSolution.mi(rev_fit) %>% data.frame() 
