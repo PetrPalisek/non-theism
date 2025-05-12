@@ -424,27 +424,27 @@ df_plot$MS <- as.numeric(ggplot2::cut_number(df_plot$MS1,n = 3))
 df_plot <- subset(df_plot, select = -c(MS1))
 
 # Melt data into a long format
-df_plot <- data.table::melt(df_plot,id.vars = c("MS","id"), variable.name = "T")
+df_plot <- reshape2::melt(df_plot,id.vars = c("MS","id"), variable.name = "T")
 levels(df_plot$T) <- c("T1","T2","T3","T4")
 
 # Recode data for BiG
 df_plot$value[is.na(df_plot$value)] <- "Missing"
 df_plot$value[df_plot$value==1] <- "Yes"
-df_plot$value[df_plot$value==.5] <- "Uncertain"
+df_plot$value[df_plot$value==".5"] <- "Uncertain"
 df_plot$value[df_plot$value==0] <- "No"
 
 
 # Define colors
-col_vector = c(  '#E7298A','#9DD1D1', 'grey', 'purple')
+col_vector = c(   '#E7298A',  'purple','#9DD1D1','grey')
 
-
+total_n1 <- nrow(df_plot[df_plot$MS==1,] %>% distinct(id))
 # Three subplots based on levels of material security
 p1 <- easyalluvial::alluvial_long(df_plot[df_plot$MS==1,]
                                   , key = T
                                   , value = value
                                   , id = id
                                   , verbose = F
-                                  ,   stratum_labels = T
+                                  , stratum_labels = T
                                   , stratum_label_size = 3.5
                                   , fill_by = 'value'
                                   , NA_label = 'None'
@@ -453,8 +453,9 @@ p1 <- easyalluvial::alluvial_long(df_plot[df_plot$MS==1,]
 ) +
   labs(title = 'Low material security') + 
   scale_x_discrete(name = "", labels = c("Wave1", "Wave2","Wave3","Wave4"),expand = c(0.05,0.05)) + 
-  scale_y_continuous(name = "Count", breaks = seq(0,1000,200),
-                     limits = c(0,1100)) + 
+  scale_y_continuous(name = "Percentage of participants",
+                     labels = function(x) paste0(round(x / total_n1 * 100), "%"), breaks = seq(0,total_n1+10,total_n1/5),
+                     limits = c(0,total_n1+10)) +
   theme_bw()  +
   theme(
     #panel.border = element_blank(),
@@ -472,8 +473,7 @@ p1 <- easyalluvial::alluvial_long(df_plot[df_plot$MS==1,]
     plot.margin=unit(c(0.4,0.4,-1,0.4),"cm"),
     strip.text.x = element_text(size = rel(2)))
 
-
-
+total_n2 <- nrow(df_plot[df_plot$MS==2,] %>% distinct(id))
 p2 <- easyalluvial::alluvial_long(df_plot[df_plot$MS==2,]
                                   , key = T
                                   , value = value
@@ -486,8 +486,10 @@ p2 <- easyalluvial::alluvial_long(df_plot[df_plot$MS==2,]
 ) +
   labs(title = 'Medium material security') +
   scale_x_discrete(name = "", labels = c("Wave1", "Wave2","Wave3","Wave4"),expand = c(0.05,0.05)) + 
-  scale_y_continuous(name = "Count", breaks = seq(0,1000,200),
-                     limits = c(0,1100)) + 
+  scale_y_continuous(name = "Percentage of participants",
+                     labels = function(x) paste0(round(x / total_n2 * 100), "%"),
+                     breaks = seq(0,total_n2+10,total_n2/5),
+                     limits = c(0,total_n2+10)) +
   theme_bw()   +
   theme(
     #panel.border = element_blank(),
@@ -505,7 +507,7 @@ p2 <- easyalluvial::alluvial_long(df_plot[df_plot$MS==2,]
     plot.margin=unit(c(0.4,0.4,-1,0.4),"cm"),
     strip.text.x = element_text(size = rel(2)))
 
-
+total_n3 <- nrow(df_plot[df_plot$MS==3,] %>% distinct(id))
 p3 <- easyalluvial::alluvial_long(df_plot[df_plot$MS==3,]
                                   , key = T
                                   , value = value
@@ -518,8 +520,11 @@ p3 <- easyalluvial::alluvial_long(df_plot[df_plot$MS==3,]
 ) +
   labs(title = 'High material security') + 
   scale_x_discrete(name = "", labels = c("Wave1", "Wave2","Wave3","Wave4"),expand = c(0.05,0.05)) + 
-  scale_y_continuous(name = "Count", breaks = seq(0,1000,200),
-                     limits = c(0,1100)) + 
+  scale_y_continuous(name = "Percentage of participants",
+                     labels = function(x) paste0(round(x / total_n3 * 100), "%"),
+                     breaks = seq(0,total_n3+10,total_n3/5),
+                     limits = c(0,total_n3+10)) +
+  
   theme_bw()  +
   theme(
     #panel.border = element_blank(),
