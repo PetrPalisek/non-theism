@@ -976,17 +976,20 @@ base <- "
    
   ## MS1 -> BiG2 -> BiG3
 
-ms1_big3 := h1a*ar3
+ms1.big2.big3.big4 := h1a*ar3*ar4
 
 ## MS1 -> BiG3 -> BiG4
 
-ms1_big4 := h1b*ar4
+ms1.big3.big4 := h1b*ar4
+
 
 h1a_ := h1a
 h1b_ := h1b
 h1c_ := h1c
 
-sumH1 := h1a_ + h1b_ + h1c_ + ms1_big3 + ms1_big4"
+sumH1 := h1c_ + 
+         ms1.big2.big3.big4 + 
+         ms1.big3.big4 "
 
 
 base_mi <- lavaan.mi::sem.mi(base, mice.imp, ordered = c("BiG1","BiG2", "BiG3", "BiG4"), meanstructure = T,
@@ -1093,15 +1096,20 @@ controls <- "
   
   ## MS1 -> BiG2 -> BiG3
 
-ms1_big3 := h1a*ar3
+ms1.big2.big3.big4 := h1a*ar3*ar4
 
 ## MS1 -> BiG3 -> BiG4
 
-ms1_big4 := h1b*ar4
+ms1.big3.big4 := h1b*ar4
+
 
 h1a_ := h1a
 h1b_ := h1b
 h1c_ := h1c
+
+sumH1 := h1c_ + 
+         ms1.big2.big3.big4 + 
+         ms1.big3.big4
 
       BiG1 | l*t1
    
@@ -1119,7 +1127,7 @@ h1c_ := h1c
    BiG3 ~ NA*1
    BiG4 ~ NA*1
    
-     sumH1 := h1a_ + h1b_ + h1c_ + ms1_big3 + ms1_big4
+    
 "
 
 controls_mi <- lavaan.mi::sem.mi(controls, mice.imp,
@@ -1127,9 +1135,38 @@ controls_mi <- lavaan.mi::sem.mi(controls, mice.imp,
                                  meanstructure = T,
                                  estimator = "WLSMV", missing = "pairwise", 
                                  parameterization = "theta", std.lv = T)
+summary(base_mi)
+
+summary(controls_mi)
 
 standardizedSolution.mi(controls_mi) %>% data.frame() %>% filter(op == ":=")
 fitmeasures(controls_mi)
+
+bind_rows(
+standardizedSolution.mi(base_mi) %>% data.frame() %>% filter(lhs == "sumH1") %>% 
+  select(est.std) %>% mutate(model = "baseline (original)", path = "summed_H1"), 
+
+standardizedSolution.mi(controls_mi) %>% data.frame() %>% filter(lhs == "sumH1") %>% 
+  select(est.std) %>% mutate(model = "controls (original)", path = "summed_H1"),
+
+standardizedSolution.mi(base_mi) %>% data.frame() %>% filter(label == "ms1_big4") %>% 
+  select(est.std) %>% mutate(model = "baseline (original)", path = "MS1->BiG4"), 
+
+standardizedSolution.mi(controls_mi) %>% data.frame() %>% filter(label == "h1c") %>% 
+  select(est.std) %>% mutate(model = "controls (original)", path = "MS1->BiG4"),
+
+standardizedSolution.mi(base_mi) %>% data.frame() %>% filter(label == "h1b") %>% 
+  select(est.std) %>% mutate(model = "baseline (original)", path = "MS1->BiG3"), 
+
+standardizedSolution.mi(controls_mi) %>% data.frame() %>% filter(label == "h1b") %>% 
+  select(est.std) %>% mutate(model = "controls (original)", path = "MS1->BiG3"),
+
+standardizedSolution.mi(base_mi) %>% data.frame() %>% filter(label == "h1a") %>% 
+  select(est.std) %>% mutate(model = "baseline (original)", path = "MS1->BiG2"), 
+
+standardizedSolution.mi(controls_mi) %>% data.frame() %>% filter(label == "h1a") %>% 
+  select(est.std) %>% mutate(model = "controls (original)", path = "MS1->BiG2")
+) %>%  mutate(est.std = round(est.std, 2))
 
 estimate_sample_size_from_rmsea <- function(fit) {
   # Get fit measures
