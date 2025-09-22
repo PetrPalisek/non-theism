@@ -11,7 +11,6 @@ library(restriktor)
 library(gorica)
 library(qpcR)
 library(readxl)
-library(tidyverse)
 library(fastDummies)
 library(Amelia)
 library(psych)
@@ -19,6 +18,7 @@ library(lavaan.mi)
 library(summarytools)
 library(dplyr)
 library(mice)
+library(tidyverse)
 
 source("https://raw.githubusercontent.com/PetrPalisek/gorica_helpers/main/extract_defined_params_lavaanmi.R")
 source("https://raw.githubusercontent.com/PetrPalisek/gorica_helpers/main/extract_defined_params_lavaan.R")
@@ -277,9 +277,6 @@ dummies_cors <- round(cor(dummies, use = "pairwise"),2)
 psych::describe(dummies)
 
 df <- cbind(df, dummies)
-
-
-
 table(df$RELTRAD_W1)
 
 # Removing from analysis non-Christian participants 
@@ -287,7 +284,6 @@ df <- df[!(df$RELTRAD_W1 %in% c("Jewish", "Other")),]
 
 # Removing from analysis unaffiliates with no Christian parent
 df <- df[!(df$RELTRAD_W1 == "INDE" & df$BNPRLCAT_W1 == 0 & df$BNPRLPRT_W1 == 0),] 
-
 
 
 # Renaming vars to match preregistration
@@ -587,14 +583,14 @@ df_forimp <- df_forimp[ , !duplicated(t(df_forimp))]  # Remove duplicate columns
 
 df_forimp <- df_forimp %>%
   mutate(across(
-    c(EDATT_W4, FirstParEd, SecondParEd,
+    c(EDATT_W4, FirstParEd, SecondParEd, ETHRACE,
       CR2_1, CR2_2, CR3_1, CR3_2, CR4_1, CR4_2, MS1, H2, H3, H4, T2, PR2, PR3, PR4, ParRit, PST),
     ~ factor(.x, ordered = TRUE)
   ))
 
 df_forimp <- df_forimp %>%
   mutate(across(
-    c(ParCatholic, ParProtestant, BlackProt, Catholic, MainProt,INDE, None),
+    c(ETHRACE, ParCatholic, ParProtestant, BlackProt, Catholic, MainProt,INDE, None),
     ~ factor(.x, ordered = FALSE)
   ))
 # --- Step 2: Imputation model setup ---
@@ -609,7 +605,7 @@ vars_to_impute <- c(
   "Inc3",  "Inc4",
   "PR2", "PR3", "PR4","CR2", "CR3", "CR4",
   "H2", "H3", "H4",
-  "RELTRAD", "T2", "PST", "ParRit"
+  "RELTRAD", "T2", "PST", "ParRit", "ETHRACE"
 )
 
 # Set method defaults
@@ -698,7 +694,7 @@ df_imp <- mice::mice(df_forimp, m = N.Imp, method = method, predictorMatrix = pr
 log <- df_imp$loggedEvents
 imputed_data_list <- list()
 
-for (i in 1:50) {
+for (i in 1:70) {
   # Complete the i-th imputed dataset
   d <- mice::complete(df_imp, action = i)
   

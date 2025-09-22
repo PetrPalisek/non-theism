@@ -200,7 +200,7 @@ df <- df %>%
     RELTRAD_W1 == 6 ~ "Other",
     RELTRAD_W1 == 7 ~ "None",
     RELTRAD_W1 == 8 ~ "Other",
-    RELTRAD_W1 == 9 ~ "INDE",
+    RELTRAD_W1 == 9 ~ "INDE"
   ))
 
 # Create education vars
@@ -247,11 +247,14 @@ df$ParEd <- paste0(df$FirstParEd, df$SecondParEd)
 df <- df %>% 
   mutate(ParEd_ord = case_when(
     ParEd == "33" ~ 5,
-    ParEd %in% c("03", "13", "23", "30", "31", "32", "3NA") ~ 4,
+    ParEd %in% c("03", "13", "23", "30", "31", "32", "3NA", "NA3") ~ 4,
     ParEd == "22" ~ 3,
-    ParEd %in% c("02", "12", "20", "21", "2NA") ~ 2,
+    ParEd %in% c("02", "12", "20", "21", "2NA", "NA2") ~ 2,
+    ParEd == "NANA" ~ NA_real_,
     .default = 1
   ))
+
+df$ParEd_ord <- factor(df$ParEd_ord, ordered = T)
 
 df$ParCollege <- ifelse(df$ParEd_ord %in% c(4, 5), 1, 0)
 df$ParAAVOC <- ifelse(df$ParEd_ord %in% c(2, 3), 1, 0)
@@ -277,12 +280,6 @@ psych::describe(dummies)
 
 df <- cbind(df, dummies)
 table(df$RELTRAD_W1)
-
-# Removing from analysis non-Christian participants 
-df <- df[!(df$RELTRAD_W1 %in% c("Jewish", "Other")),] 
-
-# Removing from analysis unaffiliates with no Christian parent
-df <- df[!(df$RELTRAD_W1 == "INDE" & df$BNPRLCAT_W1 == 0 & df$BNPRLPRT_W1 == 0),] 
 
 
 # Renaming vars to match preregistration
@@ -328,8 +325,29 @@ df$Inc3 <-  as.vector(scale(df$Inc3))
 
 str(df)
 
-# Removing from analysis W1 non-believers (but keep it for imputation!)
+
+# Excluding participants --------------------------------------------------
+
+
+# First maintain the full copy for imputation
 df_pre <- df
+
+# Removing non-Christian participants 
+df[df$RELTRAD %in% c("Jewish", "Other"),]  %>% nrow()
+# 274
+df <- df[!(df$RELTRAD %in% c("Jewish", "Other")),] 
+
+# Removing unaffiliated and indeterminate RELTRADs with no Christian parent
+
+df[(df$RELTRAD == "INDE" & df$ParCatholic == 0 & df$ParProtestant == 0),] %>% nrow()
+# 29
+df <- df[!(df$RELTRAD == "INDE" & df$ParCatholic == 0 & df$ParProtestant == 0),] 
+
+df[(df$RELTRAD == "None" & df$ParCatholic == 0 & df$ParProtestant == 0),] %>% nrow() 
+# 176
+df <- df[!(df$RELTRAD == "None" & df$ParCatholic == 0 & df$ParProtestant == 0),] 
+
+
 
 # Recode BiG_NA_Wave based on missing patterns in BiG2, BiG3, and BiG4:
 df$BiG_NA_Wave <- ifelse(
@@ -361,10 +379,14 @@ ggplot(df, aes(x = BiG_NA_Wave, y = MS1)) +
   theme_minimal() +
   theme(strip.text = element_text(size = 12))
 
+# Remove non-believers in W1
+df[df$BiG1 == "0",] %>% nrow()
+# 59
+
 df <- df[df$BiG1 != "0",] 
 
-
-# Descriptives ------------------------------------------------------------
+table(df$RELTRAD, df$BiG1)
+# Descriptives (after exclusions) ------------------------------------------------------------
 
 # Check missing values
 Amelia::missmap(df, rank.order = F)
@@ -402,6 +424,8 @@ table(df$focal_na)
 
 df_pre$BiG4NA <- ifelse(is.na(df_pre$BiG4), 1, 0)
 df_pre$BiG1 <- factor(df_pre$BiG1,ordered = F)
+
+# Predicting missingness in BiG4 by MS1
 na_fit <- glm(BiG4NA ~ BiG1*MS1, df_pre, family = binomial(link = "logit"))
 
 effects::allEffects(na_fit)
@@ -553,7 +577,6 @@ ggplot2::ggsave("Alluvial_plot.png", plot = gx, width = 12, height = 16,
 
 
 library(summarytools)
-library(glmnet)
 
 # Summarize the data
 dfSummary(df)
@@ -589,22 +612,20 @@ df_forimp <- df_forimp %>%
 
 df_forimp <- df_forimp %>%
   mutate(across(
-    c(ETHRACE, ParCatholic, ParProtestant, BlackProt, Catholic, MainProt,INDE, None),
+    c(ETHRACE, ParCatholic, ParProtestant, BlackProt, Catholic, MainProt,INDE, None, OtherRel, Jewish),
     ~ factor(.x, ordered = FALSE)
   ))
 # --- Step 2: Imputation model setup ---
 
-# List of variables to impute (as finalized earlier)
+# List of variables to impute 
 vars_to_impute <- c(
- "BiG2", "BiG3", "BiG4",
-  "MS1", "Age", "Male",
-  "ParEd_ord", "EDATT_W4",
-  "PEDUC1_W1", "PSPEDUC1_W1",
-  "PEDUC3_W1", "PSPEDUC3_W1",
-  "Inc3",  "Inc4",
-  "PR2", "PR3", "PR4","CR2", "CR3", "CR4",
-  "H2", "H3", "H4",
-  "RELTRAD", "T2", "PST", "ParRit", "ETHRACE"
+  "BiG2","BiG3","BiG4",
+  "MS1","Age","Male",
+  "ParEd_ord","EDATT_W4",
+  "Inc3","Inc4",
+  "PR2","PR3","PR4","CR2","CR3","CR4",
+  "H2","H3","H4",
+  "RELTRAD","T2","PST","ParRit","ETHRACE"
 )
 
 # Set method defaults
@@ -612,156 +633,155 @@ method <- mice::make.method(df_forimp)
 
 # Convert all character variables to factors
 df_forimp <- df_forimp %>%
-  mutate(across(where(is.character), as.factor))
+  dplyr::mutate(dplyr::across(where(is.character), as.factor))
 
+# Assign methods by type
 for (v in vars_to_impute) {
   if (v %in% names(df_forimp)) {
-    
-    # 1. Ordered factor → polr
     if (is.ordered(df_forimp[[v]])) {
       method[v] <- "polr"
-      
-      # 2. Unordered factor with >2 levels → polyreg
     } else if (is.factor(df_forimp[[v]]) && nlevels(df_forimp[[v]]) > 2) {
       method[v] <- "polyreg"
-      
-      # 3. Binary factor → logreg
     } else if (is.factor(df_forimp[[v]]) && nlevels(df_forimp[[v]]) == 2) {
       method[v] <- "logreg"
-      
-      # 4. Numeric → pmm
     } else if (is.numeric(df_forimp[[v]])) {
       method[v] <- "pmm"
-      
-      # 5. Otherwise (catch-all)
     } else {
       method[v] <- ""
     }
   }
 }
 
+table(df_forimp$EDATT_W4)
+table(df_forimp$ParEd_ord)
+table(df_forimp$ETHRACE)
 
-# Set non-imputed variables to ""
-method[!(names(method) %in% vars_to_impute)] <- ""
+
+passive_map <- c(
+  College    = "~I(as.integer(EDATT_W4 == '3'))",
+  AAVOC      = "~I(as.integer(EDATT_W4 == '2'))",
+  ParCollege = "~I(as.integer(as.numeric(ParEd_ord) %in% c(4,5)))",
+  ParAAVOC   = "~I(as.integer(as.numeric(ParEd_ord) %in% c(2,3)))",
+  BlackE     = "~I(as.integer(ETHRACE == 'Black'))",
+  LatinxE    = "~I(as.integer(ETHRACE == 'Latinx'))",
+  OtherE     = "~I(as.integer(ETHRACE == 'Other'))",
+  ConProt    = "~I(as.integer(RELTRAD == 'ConProt'))",
+  MainProt   = "~I(as.integer(RELTRAD == 'MainProt'))",
+  BlackProt  = "~I(as.integer(RELTRAD == 'BlackProt'))",
+  Catholic   = "~I(as.integer(RELTRAD == 'Catholic'))",
+  Jewish     = "~I(as.integer(RELTRAD == 'Jewish'))",
+  OtherRel     = "~I(as.integer(RELTRAD == 'Other'))",
+  None       = "~I(as.integer(RELTRAD == 'None'))",
+  INDE       = "~I(as.integer(RELTRAD == 'INDE'))")
+
+
+
+for (nm in names(passive_map)) {
+  if (nm %in% names(df_forimp)) {
+    method[nm] <- passive_map[[nm]]
+  }
+}
+
+# Set non-imputed variables (that are not passives) to ""
+method_names <- names(method)
+non_targets <- setdiff(method_names, c(vars_to_impute, names(passive_map)))
+method[non_targets] <- ""
 
 # Set up predictor matrix
 predictorMatrix <- mice::make.predictorMatrix(df_forimp)
 
-# Exclude non-imputed vars from being imputed
-predictorMatrix[!(rownames(predictorMatrix) %in% vars_to_impute), ] <- 0
+# Exclude non-imputed vars from being imputed as targets
+predictorMatrix[!(rownames(predictorMatrix) %in% c(vars_to_impute, names(passive_map))), ] <- 0
 
 # Don't use as predictors
-vars <- c("CR2_1", "CR2_2", "CR3_1", "CR3_2", "CR4_2", "CR4_1",
-          "PEDUC1", "PSPEDUC", "PEDUC3", "RELTRAD", "PSPEDUC3",
-          "College", "AAVOC", "ParCollege", "ParAAVOC",
-          colnames(predictorMatrix)[c(37:51)])
+vars <- c("CR2_1","CR2_2","CR3_1","CR3_2","CR4_2","CR4_1",
+          "PEDUC1","PSPEDUC","PEDUC3","PSPEDUC3",
+          "College","AAVOC","ParCollege","ParAAVOC", "BiG4NA",
+          "FirstParEd",  "SecondParEd", "ParEd",
+          "ParCollege",  "ParAAVOC",    "Male",   "AsianPR",     "OtherRel",
+          "BlackPR",  "LatinxPR",    "NativePR",  "OtherPR",  "BlackE", "LatinxE", "OtherE")
+
 
 # Drop as targets
 predictorMatrix[intersect(vars, rownames(predictorMatrix)), ] <- 0
 
 # Drop as predictors
 predictorMatrix[, intersect(vars, colnames(predictorMatrix))] <- 0
-  
+
+parents_present <- intersect(c("ETHRACE","EDATT_W4","ParEd_ord","RELTRAD"), colnames(predictorMatrix))
+dummy_candidates <- intersect(c("BlackE","LatinxE","OtherE",
+                                "College","AAVOC","ParCollege","ParAAVOC",
+                                "ConProt","MainProt","BlackProt","Catholic","Jewish","Other","None","INDE"),
+                              colnames(predictorMatrix))
+if (length(parents_present)) {
+  predictorMatrix[, dummy_candidates] <- 0
+}
+
 # --- Summary Table of Imputation Settings ---
-
-# Get % missing for each variable
 missing_pct <- sapply(df_forimp, function(x) sum(is.na(x)) / length(x)) * 100
-
-# Variable type (class)
 var_class <- sapply(df_forimp, function(x) class(x)[1])
-
-# Assigned imputation method
 assigned_method <- method
-
-# Whether used as predictor (in any row of predictorMatrix)
 used_as_predictor <- colSums(predictorMatrix != 0) > 0
-
-# Build summary data frame
 imputation_summary <- data.frame(
   Variable = names(df_forimp),
   MissingPercent = round(missing_pct, 1),
   Class = var_class,
   Method = assigned_method,
-  UsedAsPredictor = used_as_predictor
+  UsedAsPredictor = used_as_predictor,
+  row.names = NULL
 )
 
 imputation_summary[imputation_summary$UsedAsPredictor == TRUE,]
 imputation_summary[imputation_summary$Method != "",]
-
+imputation_summary
 
 # --- Step 3: Run the imputation ---
-df_imp <- mice::mice(df_forimp, m = N.Imp, method = method, predictorMatrix = predictorMatrix,
-               maxit = max.it, seed = seed)
+df_imp <- mice::mice(
+  df_forimp, m = N.Imp, method = method, predictorMatrix = predictorMatrix,
+  maxit = max.it, seed = seed
+)
 log <- df_imp$loggedEvents
-imputed_data_list <- list() 
 
-for (i in 1:70) {
-  d <- mice::complete(df_imp, action = i)
-  
-  # ---- Overwrite ethnicity dummies from imputed ETHRACE (no row drops) ----
-  if ("ETHRACE" %in% names(d)) {
-    eth_mf <- stats::model.frame(~ ETHRACE, data = d,
-                                 na.action = stats::na.pass,
-                                 drop.unused.levels = FALSE)
-    eth_mm <- stats::model.matrix(~ ETHRACE - 1, data = eth_mf)  # same nrow as d
-    
-    # helper to pick a column by patterns
-    pick_col <- function(patts) {
-      j <- grep(paste0("^ETHRACE(", paste(patts, collapse = "|"), ")$"),
-                colnames(eth_mm), ignore.case = TRUE)
-      if (length(j)) eth_mm[, j[1], drop = TRUE] else rep(0, nrow(eth_mm))
+# helper: force all 2-level unordered factors to numeric
+postprocess_completed <- function(d, force_numeric = c("MS1","PST")) {
+  # 1. Turn 2-level unordered factors into numeric (0/1)
+  for (nm in names(d)) {
+    if (is.factor(d[[nm]]) && !is.ordered(d[[nm]]) && nlevels(d[[nm]]) == 2) {
+      d[[nm]] <- as.integer(d[[nm]]) - 1
     }
-    
-    blk <- pick_col(c("Black", "African[[:space:]]*American", "Afro"))
-    lat <- pick_col(c("Latinx", "Latine", "Hisp", "Latino", "Latina"))
-    oth <- pick_col(c("Other"))
-    
-    # propagate NA if ETHRACE missing
-    eth_na <- is.na(d$ETHRACE)
-    blk[eth_na] <- NA_integer_
-    lat[eth_na] <- NA_integer_
-    oth[eth_na] <- NA_integer_
-    
-    d$BlackE  <- as.integer(blk)
-    d$LatinxE <- as.integer(lat)
-    d$OtherE  <- as.integer(oth)
   }
   
-  # ---- Clean column names ----
-  colnames(d) <- gsub(" ", "", colnames(d), fixed = TRUE)
-  colnames(d) <- gsub("/", "", colnames(d), fixed = TRUE)
-  colnames(d) <- gsub("-", "_", colnames(d), fixed = TRUE)
+  # 2. Force specific ordered vars (like MS1, PST) into numeric
+  for (nm in intersect(force_numeric, names(d))) {
+    d[[nm]] <- as.numeric(as.character(d[[nm]]))
+  }
   
-  # ---- Filter & recodes ----
-  d <- d[d$BiG1 != "0", ]
-  
-  if (!is.numeric(d$MS1)) d$MS1 <- as.numeric(as.character(d$MS1))
-  
-  d$BlackProt <- as.numeric(d$BlackProt)
-  d$Catholic  <- as.numeric(d$Catholic)
-  d$MainProt  <- as.numeric(d$MainProt)
-  
-  d$PST    <- as.numeric(d$PST)
-  d$ParRit <- as.numeric(d$ParRit)
-  
-  d$College <- ifelse(d$EDATT_W4 == "3", 1, 0)
-  d$AAVOC   <- ifelse(d$EDATT_W4 == "2", 1, 0)
-  
-  d$ParCollege <- ifelse(d$ParEd_ord %in% c("4", "5"), 1, 0)
-  d$ParAAVOC   <- ifelse(d$ParEd_ord %in% c("2", "3"), 1, 0)
-  
-  # ---- Save ----
-  imputed_data_list[[i]] <- d
+  d
 }
+
+imputed_data_list <- lapply(complete(df_imp, "all"), postprocess_completed)
+
+subset_post <- function(d) {
+  d %>%
+    # drop non-Christian participants
+    dplyr::filter(!(RELTRAD %in% c("Jewish", "Other"))) %>%
+    # drop unaffiliated with no Christian parent
+    dplyr::filter(!(RELTRAD == "INDE" & ParCatholic == 0 & ParProtestant == 0)) %>%
+    dplyr::filter(!(RELTRAD == "None" & ParCatholic == 0 & ParProtestant == 0)) %>%
+    # drop W1 non-believers from imputed datasets
+    dplyr::filter(BiG1 != "0")
+}
+
+imputed_data_list <- lapply(imputed_data_list, subset_post)
+
 
 mice.imp <- imputed_data_list
 
-saveRDS(df_imp, file = "df_imp.RData")
-saveRDS(mice.imp, file = "imputed_data_list.RData")
 
-# --- Step 4: Diagnostic Plots ---
-# Trace plots: Check convergence
-plot(df_imp)  # Shows mean/mode of imputed values across iterations
+saveRDS(df_imp, file = "df_imp.rds")
+saveRDS(mice.imp, file = "imputed_data_list.rds")
+
+plot(df_imp) 
 
 # Initial checks ----------------------------------------------------------
 
@@ -1065,23 +1085,6 @@ base_mi <- lavaan.mi::sem.mi(base, mice.imp, ordered = c("BiG1","BiG2", "BiG3", 
 
 fitmeasures(base_mi)
 
-avg_res_cov <- seq_along(mice.imp) %>%
-  map(function(i) {
-    sem(
-      base, mice.imp[[i]],
-      ordered = c("BiG1","BiG2","BiG3","BiG4","ParRit"),
-      meanstructure = TRUE,
-      estimator = "WLSMV", missing = "pairwise",
-      parameterization = "theta", std.lv = TRUE
-    ) %>% resid("cor") %>% pluck("res.cov")
-  }) %>%
-  { vars <- rownames(.[[1]]); map(., ~ .x[vars, vars, drop = FALSE]) } %>%
-  reduce(`+`) %>%
-  `/`(length(mice.imp))
-
-avg_res_cov %>%
-  corrplot::corrplot(method = "number")
-
 base_mi_params <- extract_defined_params_lavaanmi(base_mi)
 
 hypothesis <-  "h1a_ + h1b_ + h1c_ + ms1_big3 + ms1_big4 < 0"
@@ -1160,7 +1163,7 @@ sumH1 := h1c_ +
 
 Inc3 ~~ College"
 
-controls_mi <- lavaan.mi::sem.mi(controls, mice.imp,
+controls_mi <- lavaan.mi::sem.mi(controls, mice.imp ,
                                  ordered = c("BiG1","BiG2", "BiG3", "BiG4", "ParRit"), 
                                  meanstructure = T,
                                  estimator = "WLSMV", missing = "pairwise", 
@@ -1175,6 +1178,8 @@ controls_resid %>% pluck("res.cov") %>%
 summary(controls_mi)
 parameterEstimates.mi(controls_mi, asymptotic = TRUE) %>% filter(op == ":=")
 parameterEstimates.mi(controls_mi, asymptotic = TRUE) %>% filter(op == "~~")
+
+parameterEstimates.mi(controls_mi, asymptotic = TRUE) %>% filter(op == "~") %>% writexl::write_xlsx("controls_bs.xlsx")
 
 parameterEstimates.mi(controls_mi, asymptotic = TRUE) %>% data.frame() %>% filter(op == "~") %>% filter(grepl("BiG", lhs)) %>% filter(grepl("BiG", rhs))
 parameterEstimates.mi(controls_mi, asymptotic = TRUE) %>% data.frame() %>% filter(op == "~") %>% filter(grepl("BiG", lhs)) %>% filter(grepl("MS", rhs))
@@ -1228,7 +1233,7 @@ estimate_sample_size_from_rmsea <- function(fit) {
 estimate_sample_size_from_rmsea(controls_mi)
 
 # RMSEA_null by hand
-sqrt ( ( 1190.354-66)/(66*2970) )
+sqrt ( ( 957.037-66)/(66*2970) )
 
 controls <- "
    BiG1 ~ Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE + OtherE+ ParRit
@@ -2032,9 +2037,9 @@ H1_base_ml_ben <- benchmark(H1_base_ml)
 # Controls model ML
 
 controls_ml <- "
-   BiG1 ~ Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE + OtherE
-   BiG2 ~ Male + BlackProt + Catholic + MainProt   + BlackE + LatinxE + OtherE
-   BiG3 ~ Male + BlackProt + Catholic + MainProt + BlackE + LatinxE + OtherE
+   BiG1 ~ Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE + OtherE + ParRit
+   BiG2 ~ Male + BlackProt + Catholic + MainProt   + BlackE + LatinxE + OtherE+ ParRit
+   BiG3 ~ Male + BlackProt + Catholic + MainProt + BlackE + LatinxE + OtherE+ ParRit
    BiG4 ~ Age + Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE  + OtherE +
    Inc3 + ParRit + College + AAVOC + PST
 
@@ -2056,6 +2061,12 @@ controls_ml <- "
   
   Inc3 ~ MS1
   ParRit ~ ParCollege + ParAAVOC
+  
+     Catholic ~~ MainProt + BlackProt
+   MainProt ~~ BlackProt
+      AAVOC ~~ College
+
+Inc3 ~~ College
 
     ## MS1 -> BiG2 -> BiG3
 
@@ -2603,9 +2614,9 @@ base_nest_ord <- "
 PST_l =~ PST
 PST ~~ 0*PST
 
-   BiG1 ~ Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE + OtherE
-   BiG2 ~ Male + BlackProt + Catholic + MainProt   + BlackE + LatinxE + OtherE
-   BiG3 ~ Male + BlackProt + Catholic + MainProt + BlackE + LatinxE + OtherE
+   BiG1 ~ Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE + OtherE + ParRit
+   BiG2 ~ Male + BlackProt + Catholic + MainProt   + BlackE + LatinxE + OtherE + ParRit
+   BiG3 ~ Male + BlackProt + Catholic + MainProt + BlackE + LatinxE + OtherE + ParRit
    BiG4 ~ Age + Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE  + OtherE +
    Inc3 + ParRit + College + AAVOC + PST_l
  
@@ -2627,30 +2638,7 @@ PST ~~ 0*PST
   ParRit ~ ParCollege + ParAAVOC
 
 
-  # PR
 
-PR2_l =~ PR2
-PR2 ~~ 0*PR2
-  
-PR3 ~  PR2_l + h3.1a*H2 + T2
-
-# CR
-CR2_l =~ CR2
-CR2 ~~ 0*CR2
-
-CR3 ~ CR2_l + H2 + h3.2a*T2
-
-
-
-
-    # H
- 
-   H2 ~ MS1
-   H3 ~ arH*H2
-      # T
- 
-  T2 ~ MS1
- 
 
 
       BiG1 | l*t1
@@ -2664,64 +2652,13 @@ CR3 ~ CR2_l + H2 + h3.2a*T2
    BiG4 | k*t1
    BiG4 | l*t2
    
-      
-   BiG1 ~ 0*1
-   BiG2 ~ NA*1
-   BiG3 ~ NA*1
-   BiG4 ~ NA*1
-
-   PR2 | pr1*t1
-   PR2 | pr2*t2
-   PR2 | pr3*t3
-   PR2 | pr4*t4
-   PR2 | pr5*t5
-   PR2 | pr6*t6
-   
-   PR3 | pr1*t1
-   PR3 | pr2*t2
-   PR3 | pr3*t3
-   PR3 | pr4*t4
-   PR3 | pr5*t5
-   PR3 | pr6*t6
 
    
-   CR2 | cr1*t1
-   CR2 | cr2*t2
-   CR2 | cr3*t3
-   CR2 | cr4*t4
-   CR2 | cr5*t5
-   CR2 | cr6*t6
-   
-   CR3 | cr1*t1
-   CR3 | cr2*t2
-   CR3 | cr3*t3
-   CR3 | cr4*t4
-   CR3 | cr5*t5
-   CR3 | cr6*t6
+   Catholic ~~ MainProt + BlackProt
+   MainProt ~~ BlackProt
+      AAVOC ~~ College
 
-   
-   H2 | hth1*t1
-   H2 | hth2*t2
-   H2 | hth3*t3
-   H2 | hth4*t4
-   
-   H3 | hth1*t1
-   H3 | hth2*t2
-   H3 | hth3*t3
-   H3 | hth4*t4
-   
-
-   
-   PR2 ~ 0*1
-   PR3 ~ NA*1
-   
-   CR2 ~ 0*1
-   CR3 ~ NA*1
-   
-   H2 ~ 0*1
-   H3 ~ NA*1
-   
-
+Inc3 ~~ College
 
    "
 
@@ -2739,9 +2676,9 @@ h1_nest_ord <-"
 PST_l =~ PST
 PST ~~ 0*PST
 
-   BiG1 ~ Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE + OtherE
-   BiG2 ~ Male + BlackProt + Catholic + MainProt   + BlackE + LatinxE + OtherE
-   BiG3 ~ Male + BlackProt + Catholic + MainProt + BlackE + LatinxE + OtherE
+   BiG1 ~ Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE + OtherE + ParRit
+   BiG2 ~ Male + BlackProt + Catholic + MainProt   + BlackE + LatinxE + OtherE + ParRit
+   BiG3 ~ Male + BlackProt + Catholic + MainProt + BlackE + LatinxE + OtherE + ParRit
    BiG4 ~ Age + Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE  + OtherE +
    Inc3 + ParRit + College + AAVOC + PST_l
  
@@ -2874,9 +2811,9 @@ h2.1_nest_ord <-"
   PST_l =~ PST
 PST ~~ 0*PST
 
-   BiG1 ~ Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE + OtherE
-   BiG2 ~ Male + BlackProt + Catholic + MainProt   + BlackE + LatinxE + OtherE
-   BiG3 ~ Male + BlackProt + Catholic + MainProt + BlackE + LatinxE + OtherE
+   BiG1 ~ Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE + OtherE + ParRit
+   BiG2 ~ Male + BlackProt + Catholic + MainProt   + BlackE + LatinxE + OtherE + ParRit
+   BiG3 ~ Male + BlackProt + Catholic + MainProt + BlackE + LatinxE + OtherE + ParRit
    BiG4 ~ Age + Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE  + OtherE +
    Inc3 + ParRit + College + AAVOC + PST_l
  
@@ -3009,9 +2946,9 @@ h2.2_nest_ord <-"
   PST_l =~ PST
 PST ~~ 0*PST
 
-   BiG1 ~ Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE + OtherE
-   BiG2 ~ Male + BlackProt + Catholic + MainProt   + BlackE + LatinxE + OtherE
-   BiG3 ~ Male + BlackProt + Catholic + MainProt + BlackE + LatinxE + OtherE
+   BiG1 ~ Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE + OtherE + ParRit
+   BiG2 ~ Male + BlackProt + Catholic + MainProt   + BlackE + LatinxE + OtherE + ParRit
+   BiG3 ~ Male + BlackProt + Catholic + MainProt + BlackE + LatinxE + OtherE + ParRit
    BiG4 ~ Age + Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE  + OtherE +
    Inc3 + ParRit + College + AAVOC + PST_l
  
@@ -3143,9 +3080,9 @@ h3.1_nest_ord <-"
      PST_l =~ PST
 PST ~~ 0*PST
 
-   BiG1 ~ Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE + OtherE
-   BiG2 ~ Male + BlackProt + Catholic + MainProt   + BlackE + LatinxE + OtherE
-   BiG3 ~ Male + BlackProt + Catholic + MainProt + BlackE + LatinxE + OtherE
+   BiG1 ~ Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE + OtherE + ParRit
+   BiG2 ~ Male + BlackProt + Catholic + MainProt   + BlackE + LatinxE + OtherE + ParRit
+   BiG3 ~ Male + BlackProt + Catholic + MainProt + BlackE + LatinxE + OtherE + ParRit
    BiG4 ~ Age + Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE  + OtherE +
    Inc3 + ParRit + College + AAVOC + PST_l
  
@@ -3286,9 +3223,9 @@ h3.2_nest_h1dropped_ord <-"
 PST_l =~ PST
 PST ~~ 0*PST
 
-   BiG1 ~ Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE + OtherE
-   BiG2 ~ Male + BlackProt + Catholic + MainProt   + BlackE + LatinxE + OtherE
-   BiG3 ~ Male + BlackProt + Catholic + MainProt + BlackE + LatinxE + OtherE
+   BiG1 ~ Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE + OtherE + ParRit
+   BiG2 ~ Male + BlackProt + Catholic + MainProt   + BlackE + LatinxE + OtherE + ParRit
+   BiG3 ~ Male + BlackProt + Catholic + MainProt + BlackE + LatinxE + OtherE + ParRit
    BiG4 ~ Age + Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE  + OtherE +
    Inc3 + ParRit + College + AAVOC + PST_l
  
@@ -3454,9 +3391,9 @@ h3.2_nest_h1dropped_ord_fit <- lavaan.mi::sem.mi(h3.2_nest_h1dropped_ord, mice.i
 
 h3.2_nest_h1_h2.1_dropped <-"
 
-   BiG1 ~ Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE + OtherE
-   BiG2 ~ Male + BlackProt + Catholic + MainProt   + BlackE + LatinxE + OtherE
-   BiG3 ~ Male + BlackProt + Catholic + MainProt + BlackE + LatinxE + OtherE
+   BiG1 ~ Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE + OtherE + ParRit
+   BiG2 ~ Male + BlackProt + Catholic + MainProt   + BlackE + LatinxE + OtherE + ParRit
+   BiG3 ~ Male + BlackProt + Catholic + MainProt + BlackE + LatinxE + OtherE + ParRit
    BiG4 ~ Age + Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE  + OtherE +
    Inc3 + ParRit + College + AAVOC + PST
  
@@ -3496,9 +3433,9 @@ summary(h3.2_nest_h1_h2.1_dropped_fit, std = T, fit = T)
 
 h3.2_nest_h1_h2.2_dropped <-"
 
-   BiG1 ~ Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE + OtherE
-   BiG2 ~ Male + BlackProt + Catholic + MainProt   + BlackE + LatinxE + OtherE
-   BiG3 ~ Male + BlackProt + Catholic + MainProt + BlackE + LatinxE + OtherE
+   BiG1 ~ Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE + OtherE + ParRit
+   BiG2 ~ Male + BlackProt + Catholic + MainProt   + BlackE + LatinxE + OtherE + ParRit
+   BiG3 ~ Male + BlackProt + Catholic + MainProt + BlackE + LatinxE + OtherE + ParRit
    BiG4 ~ Age + Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE  + OtherE +
    Inc3 + ParRit + College + AAVOC + PST
  
@@ -3537,9 +3474,9 @@ h3.2_nest_h1_h2.2_dropped_fit <- lavaan::sem(model = h3.2_nest_h1_h2.2_dropped, 
 
 h3.2_nest_h1_h3.1_dropped <-"
 
-   BiG1 ~ Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE + OtherE
-   BiG2 ~ Male + BlackProt + Catholic + MainProt   + BlackE + LatinxE + OtherE
-   BiG3 ~ Male + BlackProt + Catholic + MainProt + BlackE + LatinxE + OtherE
+   BiG1 ~ Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE + OtherE + ParRit
+   BiG2 ~ Male + BlackProt + Catholic + MainProt   + BlackE + LatinxE + OtherE + ParRit
+   BiG3 ~ Male + BlackProt + Catholic + MainProt + BlackE + LatinxE + OtherE + ParRit
    BiG4 ~ Age + Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE  + OtherE +
    Inc3 + ParRit + College + AAVOC + PST
  
@@ -3576,9 +3513,9 @@ h3.2_nest_h1_h3.1_dropped_fit <- lavaan::sem(model = h3.2_nest_h1_h3.1_dropped, 
 
 h3.2_nest_h1_h2.2_h3.1_dropped <-"
 
-   BiG1 ~ Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE + OtherE
-   BiG2 ~ Male + BlackProt + Catholic + MainProt   + BlackE + LatinxE + OtherE
-   BiG3 ~ Male + BlackProt + Catholic + MainProt + BlackE + LatinxE + OtherE
+   BiG1 ~ Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE + OtherE + ParRit
+   BiG2 ~ Male + BlackProt + Catholic + MainProt   + BlackE + LatinxE + OtherE + ParRit
+   BiG3 ~ Male + BlackProt + Catholic + MainProt + BlackE + LatinxE + OtherE + ParRit
    BiG4 ~ Age + Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE  + OtherE +
    Inc3 + ParRit + College + AAVOC + PST
  
@@ -3629,9 +3566,9 @@ comp_ordinal <- compareFit(base_nest_fit_ord, h1_nest_fit_ord, h2.1_nest_fit_ord
 
 base_nest <- "
 
-   BiG1 ~ Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE + OtherE
-   BiG2 ~ Male + BlackProt + Catholic + MainProt   + BlackE + LatinxE + OtherE
-   BiG3 ~ Male + BlackProt + Catholic + MainProt + BlackE + LatinxE + OtherE
+   BiG1 ~ Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE + OtherE + ParRit
+   BiG2 ~ Male + BlackProt + Catholic + MainProt   + BlackE + LatinxE + OtherE + ParRit
+   BiG3 ~ Male + BlackProt + Catholic + MainProt + BlackE + LatinxE + OtherE + ParRit
    BiG4 ~ Age + Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE  + OtherE +
    Inc3 + ParRit + College + AAVOC + PST
  
