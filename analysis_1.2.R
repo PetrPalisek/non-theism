@@ -18,6 +18,8 @@ library(summarytools)
 library(dplyr)
 library(mice)
 library(tidyverse)
+library(summarytools)
+library(openxlsx)
 
 source("https://raw.githubusercontent.com/PetrPalisek/gorica_helpers/main/extract_defined_params_lavaanmi.R")
 source("https://raw.githubusercontent.com/PetrPalisek/gorica_helpers/main/extract_defined_params_lavaan.R")
@@ -395,10 +397,21 @@ na_sum <- data.frame(lapply(df, function(x) sum(is.na(x))))
 na_sum[2,] <- round(na_sum[1,]/nrow(df)*100,2)
 na_sum <- t(na_sum) # % missing per var
 
+table(df$BiG1, useNA = "ifany")
+table(df$BiG2, useNA = "ifany") 
+table(df$BiG3, useNA = "ifany") 
+table(df$BiG4, useNA = "ifany") 
+
+table(df$BiG1) %>% prop.table() %>% round(2)
+table(df$BiG2) %>% prop.table() %>% round(2)
+table(df$BiG3) %>% prop.table() %>% round(2)
+table(df$BiG4) %>% prop.table() %>% round(2)
+
 table(df$BiG1, useNA = "ifany") %>% prop.table() %>% round(2)
 table(df$BiG2, useNA = "ifany") %>% prop.table() %>% round(2)
 table(df$BiG3, useNA = "ifany") %>% prop.table() %>% round(2)
 table(df$BiG4, useNA = "ifany") %>% prop.table() %>% round(2)
+
 
 
 # missing in BiG
@@ -435,8 +448,8 @@ summary(na_fit)
 ### Plot raw data_______________________________________________________________________________
 
 # Create a subset of data for the plot
-df_plot <- subset(df, select = c(BiG1,BiG2,BiG3,BiG4,MS1, id))
-df_plot <- df_plot[!is.na(df_plot$MS1),]
+df_plot <- subset(df_pre, select = c(BiG1,BiG2,BiG3,BiG4,MS1, id))
+df_plot <- df_plot[!is.na(df_plot$MS1) & !is.na(df_plot$BiG1),]
 
 # Cut data into 3 roughly equivalent groups based on material security
 df_plot$MS <- as.numeric(ggplot2::cut_number(df_plot$MS1,n = 3))
@@ -455,6 +468,8 @@ df_plot$value[df_plot$value==0] <- "No"
 
 # Define colors
 col_vector = c(   '#E7298A',  'purple','#9DD1D1','grey')
+
+
 
 total_n1 <- nrow(df_plot[df_plot$MS==1,] %>% distinct(id))
 # Three subplots based on levels of material security
@@ -499,7 +514,6 @@ p2 <- easyalluvial::alluvial_long(df_plot[df_plot$MS==2,]
                                   , id = id
                                   , stratum_label_size = 3.5
                                   , fill_by = 'value'
-                                  , NA_label = 'None'
                                   , col_vector_value = col_vector
                                   , col_vector_flow = col_vector
 ) +
@@ -569,18 +583,42 @@ gx <- ggpubr::ggarrange(p1, p2, p3, ncol=1, nrow = 3,
 
 gx
 
+print(c(total_n1,
+      total_n2,
+      total_n3))
+
 ggplot2::ggsave("Alluvial_plot.png", plot = gx, width = 12, height = 16,
                 dpi = 600)
 
+table(df_plot[df_plot$MS == 1,"value"], df_plot[df_plot$MS == 1,"T"]) %>% prop.table() %>% round(2)
+table(df_plot[df_plot$MS == 3,"value"], df_plot[df_plot$MS == 3,"T"]) %>% prop.table() %>% round(2)
+
+df_plot %>%
+  filter(T %in% c("T1","T4")) %>%
+  select(id, MS, T, value) %>%
+  # Keep only Yes/No for the transition metric; drop Missing/Uncertain
+  filter(value %in% c("Yes","No")) %>%
+  pivot_wider(names_from = T, values_from = value) %>%
+  # Require non-missing at both waves
+  filter(!is.na(T1), !is.na(T4)) %>%
+  group_by(MS) %>%
+  summarize(
+    N_T1_yes      = sum(T1 == "Yes"),
+    T1Yes_T4No    = sum(T1 == "Yes" & T4 == "No"),
+    pct_T1Yes_to_T4No = round(100 * T1Yes_T4No / N_T1_yes, 0),
+    .groups = "drop"
+  ) %>%
+  arrange(MS)
 
 ## Summaries -------------------------------------------------------------
 
 
-library(summarytools)
 
 # Summarize the data
 dfSummary(df)
 quantile(df$MS1, na.rm = T)
+
+paste0("% protestants ", 14.1+36.6+12.1)
 
 # Imputation --------------------------------------------------------------
 
@@ -652,9 +690,7 @@ for (v in vars_to_impute) {
   }
 }
 
-table(df_forimp$EDATT_W4)
-table(df_forimp$ParEd_ord)
-table(df_forimp$ETHRACE)
+
 
 
 passive_map <- c(
@@ -782,6 +818,17 @@ saveRDS(df_imp, file = "df_imp.rds")
 saveRDS(mice.imp, file = "imputed_data_list.rds")
 
 plot(df_imp) 
+
+table(mice.imp[[1]]$EDATT_W4)
+table(mice.imp[[1]]$ParEd_ord)
+table(mice.imp[[1]]$ETHRACE)
+table(mice.imp[[1]]$RELTRAD)
+
+mice.imp[[1]] %>%
+  filter(is.na(MS1)) %>%
+  select(all_of(imputation_summary %>%
+                  filter(UsedAsPredictor) %>%
+                  pull(Variable)))
 
 # Initial checks ----------------------------------------------------------
 
@@ -1035,13 +1082,16 @@ parameterEstimates.mi(base_mi, asymptotic = TRUE)
 
 parameterEstimates.mi(base_mi, asymptotic = TRUE) %>% data.frame() %>% filter(op == "~") %>% filter(grepl("BiG", lhs)) %>% filter(grepl("BiG", rhs))
 parameterEstimates.mi(base_mi, asymptotic = TRUE) %>% data.frame() %>% filter(op == "~") %>% filter(grepl("BiG", lhs)) %>% filter(grepl("MS", rhs))
-
+parameterEstimates.mi(base_mi, asymptotic = TRUE) %>% filter(op == "~") %>% writexl::write_xlsx("base_bs.xlsx")
 
 standardizedSolution.mi(base_mi) %>% data.frame() %>% filter(op == ":=")
 standardizedSolution.mi(base_mi) %>% data.frame() %>% filter(op == "~") %>% filter(grepl("BiG", lhs)) %>% filter(grepl("BiG", rhs))
 standardizedSolution.mi(base_mi) %>% data.frame() %>% filter(op == "~") %>% filter(grepl("BiG", lhs)) %>% filter(grepl("MS", rhs))
 
 fitmeasures(base_mi)
+
+lavResiduals.mi(base_mi, type = "cor") %>% pluck("res.cov") %>%
+  corrplot::corrplot(method = "number")
 
 base <- "
 
@@ -1233,7 +1283,7 @@ estimate_sample_size_from_rmsea <- function(fit) {
 estimate_sample_size_from_rmsea(controls_mi)
 
 # RMSEA_null by hand
-sqrt ( ( 957.037-66)/(66*2970) )
+sqrt ( ( 1080.404-66)/(66*2829) )
 
 controls <- "
    BiG1 ~ Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE + OtherE+ ParRit
@@ -1307,6 +1357,8 @@ c[,5:10] <-  c[,5:10] %>% round(3)
 c %>% filter(op == "~") %>% filter(grepl("BiG", lhs)) %>% filter(grepl("BiG", rhs))
 c %>% filter(op == "~") %>% filter(grepl("BiG", lhs)) %>% filter(grepl("MS", rhs))
 
+c %>% filter(op == "~") %>% writexl::write_xlsx("controls_betas.xlsx")
+
 controls_mi_params <- extract_defined_params_lavaanmi(controls_mi)
 
 hypothesis <-  "h1a_ + h1b_ + h1c_ + ms1_big3 + ms1_big4 < 0"
@@ -1325,13 +1377,14 @@ full_ordinal <- "
 PST_l =~ PST
 PST ~~ 0*PST
 
-   BiG1 ~ Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE + OtherE
-   BiG2 ~ Male + BlackProt + Catholic + MainProt   + BlackE + LatinxE + OtherE
-   BiG3 ~ Male + BlackProt + Catholic + MainProt + BlackE + LatinxE + OtherE
+   BiG1 ~ Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE + OtherE + ParRit
+   BiG2 ~ Male + BlackProt + Catholic + MainProt   + BlackE + LatinxE + OtherE+ ParRit
+   BiG3 ~ Male + BlackProt + Catholic + MainProt + BlackE + LatinxE + OtherE+ ParRit
    BiG4 ~ Age + Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE  + OtherE +
    Inc3 + ParRit + College + AAVOC + PST_l
  
-     eta_BiG =~ BiG1 + 1*BiG2 + 1*BiG3 + 1*BiG4
+    
+    eta_BiG =~ BiG1 + 1*BiG2 + 1*BiG3 + 1*BiG4
 
    BiG2 ~ BiG1 + h1a*MS1
    BiG3 ~ ar3*BiG2 + h1b*MS1+ h2.1a*H2 +h2.2a*T2 + PR2_l + CR2_l 
@@ -1347,6 +1400,7 @@ PST ~~ 0*PST
   College + AAVOC ~ ParCollege + ParAAVOC + Age + MS1
   Inc3 ~ MS1
   ParRit ~ ParCollege + ParAAVOC
+  
 
 
   # PR
@@ -1469,19 +1523,17 @@ h3.2direct := h2.2b
    H3 | hth4*t4
    
 
-   
-   PR2 ~ 0*1
-   PR3 ~ NA*1
-   
-   CR2 ~ 0*1
-   CR3 ~ NA*1
-   
-   H2 ~ 0*1
-   H3 ~ NA*1
+
    
      sumH1 := h1a_ + h1b_ + h1c_ + ms1_big3 + ms1_big4
   sumH2_1 := h3.1direct + h2_big4 + h2_h3_big4
   sumH2_2 := h3.2direct + t2_big4
+  
+     Catholic ~~ MainProt + BlackProt
+   MainProt ~~ BlackProt
+      AAVOC ~~ College
+
+Inc3 ~~ College
    "
 
 full_ordinal_fit <- lavaan.mi::sem.mi(full_ordinal, mice.imp, 
@@ -1489,9 +1541,17 @@ full_ordinal_fit <- lavaan.mi::sem.mi(full_ordinal, mice.imp,
                                       meanstructure = T, ordered = c("BiG1", "BiG2", "BiG3", "BiG4", "ParRit", "PR2", 
                                                                      "PR3", "CR2", "CR3", "H2", "H3", "T2", "PST"),
                                       missing = "pairwise",  control = list(iter.max = 10e5))
+full_resid <- lavResiduals.mi(full_ordinal_fit, type = "cor")
+
+full_resid %>% pluck("res.cov") %>%
+  corrplot::corrplot(method = "number")
 
 summary(full_ordinal_fit)
 fitmeasures(full_ordinal_fit)
+
+parameterEstimates.mi(full_ordinal_fit, asymptotic = T) %>% filter(op == ":=")
+parameterEstimates.mi(full_ordinal_fit, asymptotic = T) %>% filter(op == "~") %>%
+  openxlsx::write.xlsx("full_bs.xlsx")
 
 s <- standardizedSolution.mi(full_ordinal_fit) %>% data.frame() 
 s[,5:10] <-  s[,5:10] %>% round(3)
@@ -1521,9 +1581,9 @@ full_ordinal <- "
 PST_l =~ PST
 PST ~~ 0*PST
 
-   BiG1 ~ Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE + OtherE
-   BiG2 ~ Male + BlackProt + Catholic + MainProt   + BlackE + LatinxE + OtherE
-   BiG3 ~ Male + BlackProt + Catholic + MainProt + BlackE + LatinxE + OtherE
+   BiG1 ~ Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE + OtherE + ParRit
+   BiG2 ~ Male + BlackProt + Catholic + MainProt   + BlackE + LatinxE + OtherE+ ParRit
+   BiG3 ~ Male + BlackProt + Catholic + MainProt + BlackE + LatinxE + OtherE+ ParRit
    BiG4 ~ Age + Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE  + OtherE +
    Inc3 + ParRit + College + AAVOC + PST_l
  
@@ -1573,7 +1633,7 @@ CR3 ~ CR2_l + H2 + h3.2a*T2
   
 ## MS1 -> BiG2 -> BiG3
  
-ms1_big3 := h1a*ar3
+ms1_big3 := h1a*ar3*ar4
  
 ## MS1 -> BiG3 -> BiG4
  
@@ -1618,11 +1678,7 @@ h3.2direct := h2.2b
    BiG4 | k*t1
    BiG4 | l*t2
    
-      
-   BiG1 ~ 0*1
-   BiG2 ~ NA*1
-   BiG3 ~ NA*1
-   BiG4 ~ NA*1
+    
 
    PR2 | pr1*t1
    PR2 | pr2*t2
@@ -1665,15 +1721,11 @@ h3.2direct := h2.2b
    H3 | hth4*t4
    
 
-   
-   PR2 ~ 0*1
-   PR3 ~ NA*1
-   
-   CR2 ~ 0*1
-   CR3 ~ NA*1
-   
-   H2 ~ 0*1
-   H3 ~ NA*1
+     Catholic ~~ MainProt + BlackProt
+   MainProt ~~ BlackProt
+      AAVOC ~~ College
+
+Inc3 ~~ College
    
 
    "
@@ -1692,7 +1744,6 @@ fitmeasures(full_ordinal_fit)
 
 s <- lavaan.mi::standardizedSolution.mi(full_ordinal_fit) 
 
-xlsx::write.xlsx2(s %>% data.frame(), "params.xlsx")
 
 
 sqrt((13261.76-190)/(190*1386))
@@ -1973,9 +2024,6 @@ H3.2partneg_mi_eval <- restriktor::goric(full_ordinal_mi_params[["est"]], VCOV =
                                          hypotheses = list(
                                            H3.2partneg = H3.2partneg), comparison = "complement")
 benchmark(H3.2partneg_mi_eval)
-
-
-save.image("nontheism.RData")
 
 
 # Sensitivity checks ------------------------------------------------------
