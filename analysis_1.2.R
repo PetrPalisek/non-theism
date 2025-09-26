@@ -1340,7 +1340,9 @@ h1c_ := h1c
    MainProt ~~ BlackProt
       AAVOC ~~ College
 
-Inc3 ~~ College"
+Inc3 ~~ College
+
+"
 
 
 controls_mi <- lavaan.mi::sem.mi(controls, mice.imp,
@@ -1388,7 +1390,7 @@ PST ~~ 0*PST
 
    BiG2 ~ BiG1 + h1a*MS1
    BiG3 ~ ar3*BiG2 + h1b*MS1+ h2.1a*H2 +h2.2a*T2 + PR2_l + CR2_l 
-   BiG4 ~ ar4*BiG3 + h1c*MS1 + h2.1b*H2 + h2.2b*T2 + h2.1d*H3 + h3.2b*PR3 +  h3.1b*CR3 
+   BiG4 ~ ar4*BiG3 + h1c*MS1 + h2.1b*H2 + h2.2b*T2 + h2.1d*H3 + h3.1b*PR3 +  h3.2b*CR3 
 
   # Misc
  
@@ -1475,12 +1477,7 @@ h3.2direct := h2.2b
    
    BiG4 | k*t1
    BiG4 | l*t2
-   
-      
-   BiG1 ~ 0*1
-   BiG2 ~ NA*1
-   BiG3 ~ NA*1
-   BiG4 ~ NA*1
+  
 
    PR2 | pr1*t1
    PR2 | pr2*t2
@@ -1531,10 +1528,12 @@ h3.2direct := h2.2b
   
      Catholic ~~ MainProt + BlackProt
    MainProt ~~ BlackProt
-      AAVOC ~~ College
 
 Inc3 ~~ College
+
+ParRit ~~ CR2_l + CR3 + PR2_l + PR3
    "
+
 
 full_ordinal_fit <- lavaan.mi::sem.mi(full_ordinal, mice.imp, 
                                       estimator = "WLSMV", parameterization = "theta",
@@ -1550,11 +1549,19 @@ summary(full_ordinal_fit)
 fitmeasures(full_ordinal_fit)
 
 parameterEstimates.mi(full_ordinal_fit, asymptotic = T) %>% filter(op == ":=")
+parameterEstimates.mi(full_ordinal_fit, asymptotic = T) %>% filter(op == "~")
+parameterEstimates.mi(full_ordinal_fit, asymptotic = T) %>% filter(op == "~~")
+
+parameterEstimates.mi(full_ordinal_fit, asymptotic = T) %>% filter(op == "~") %>%
+  filter(rhs == "MS1")
+
+
 parameterEstimates.mi(full_ordinal_fit, asymptotic = T) %>% filter(op == "~") %>%
   openxlsx::write.xlsx("full_bs.xlsx")
 
 s <- standardizedSolution.mi(full_ordinal_fit) %>% data.frame() 
 s[,5:10] <-  s[,5:10] %>% round(3)
+s %>% filter(op == "~") %>% filter(grepl("BiG", lhs))
 s %>% filter(op == "~") %>% filter(grepl("BiG", lhs)) %>% filter(grepl("BiG", rhs))
 s %>% filter(op == "~") %>% filter(grepl("BiG", lhs)) %>% filter(grepl("MS", rhs))
 s %>% filter(op == "~") %>% filter(grepl("H2", lhs)) %>% filter(grepl("MS", rhs))
@@ -1567,13 +1574,14 @@ s %>% filter(op == "~") %>% filter(grepl("CR", rhs))
 s %>% filter(op == ":=") %>% filter(grepl("indirect", label))
 s %>% filter(op == ":=") %>% filter(grepl("sum", label))
 s %>% filter(op == ":=") 
+s %>% filter(op == "~~") 
 
 
 
 
 estimate_sample_size_from_rmsea(full_ordinal_fit)
 
-sqrt ( (  3272.156  -190)/(190*2872) )
+sqrt ( (  2583.904  -190)/(190*2929) )
 
 
 full_ordinal <- "
@@ -1591,7 +1599,7 @@ PST ~~ 0*PST
 
    BiG2 ~ BiG1 + h1a*MS1
    BiG3 ~ ar3*BiG2 + h1b*MS1+ h2.1a*H2 +h2.2a*T2 + PR2_l + CR2_l 
-   BiG4 ~ ar4*BiG3 + h1c*MS1 + h2.1b*H2 + h2.2b*T2 + h2.1d*H3 + h3.2b*PR3 +  h3.1b*CR3 
+   BiG4 ~ ar4*BiG3 + h1c*MS1 + h2.1b*H2 + h2.2b*T2 + h2.1d*H3 + h3.1b*PR3 +  h3.2b*CR3 
 
   # Misc
  
@@ -1720,14 +1728,13 @@ h3.2direct := h2.2b
    H3 | hth3*t3
    H3 | hth4*t4
    
-
+   
      Catholic ~~ MainProt + BlackProt
    MainProt ~~ BlackProt
-      AAVOC ~~ College
 
 Inc3 ~~ College
-   
 
+ParRit ~~ CR2_l + CR3 + PR2_l + PR3
    "
 
 full_ordinal_fit <- lavaan.mi::sem.mi(full_ordinal, mice.imp, 
@@ -1741,12 +1748,6 @@ full_ordinal_fit <- lavaan.mi::sem.mi(full_ordinal, mice.imp,
 standardizedSolution.mi(full_ordinal_fit) %>% data.frame() %>% filter(op == ":=")
 
 fitmeasures(full_ordinal_fit)
-
-s <- lavaan.mi::standardizedSolution.mi(full_ordinal_fit) 
-
-
-
-sqrt((13261.76-190)/(190*1386))
 
 
 ## Full ordinal (preregistered) ---------------------------------------------------
@@ -2651,1588 +2652,160 @@ H3.2full_eval_ben <- benchmark(H3.2full_eval)
 
 # Nested models -----------------------------------------------------------
 
-
-##  Ordinal (DO NOT RUN) --------------------------------------------------------------
-
-# No hypothesized paths present 
-
+# ---- 1) Base model: all hypothesis paths fixed to zero ----
 base_nest_ord <- "
-
-  
 PST_l =~ PST
 PST ~~ 0*PST
 
-   BiG1 ~ Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE + OtherE + ParRit
-   BiG2 ~ Male + BlackProt + Catholic + MainProt   + BlackE + LatinxE + OtherE + ParRit
-   BiG3 ~ Male + BlackProt + Catholic + MainProt + BlackE + LatinxE + OtherE + ParRit
-   BiG4 ~ Age + Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE  + OtherE +
-   Inc3 + ParRit + College + AAVOC + PST_l
- 
-     eta_BiG =~ BiG1 + 1*BiG2 + 1*BiG3 + 1*BiG4
+PR2_l =~ PR2
+PR2 ~~ 0*PR2
 
-   BiG2 ~ BiG1 + 0*MS1
-   BiG3 ~ ar3*BiG2 + 0*MS1+ 0*H2 + 0*T2 + PR2_l + CR2_l 
-   BiG4 ~ ar4*BiG3 + 0*MS1 + 0*H2 + 0*T2 + 0*H3 + 0*PR3 +  0*CR3 
+CR2_l =~ CR2
+CR2 ~~ 0*CR2
 
-  # Misc
- 
-  MS1 ~ ParCollege + ParAAVOC + BlackE + LatinxE + OtherE
-  BlackProt ~ BlackE
-  Catholic ~ LatinxE
-  BlackProt + MainProt + Catholic ~ OtherE
- 
-  College + AAVOC ~ ParCollege + ParAAVOC + Age + MS1
-  Inc3 ~ MS1
-  ParRit ~ ParCollege + ParAAVOC
+eta_BiG =~ BiG1 + 1*BiG2 + 1*BiG3 + 1*BiG4
 
+BiG1 ~ 0* MS1
+BiG2 ~ BiG1 + 0*MS1
+BiG3 ~ ar3*BiG2 + 0*MS1 + 0*H2 + 0*T2 + PR2_l + CR2_l 
+BiG4 ~ ar4*BiG3 + 0*MS1 + 0*H2 + 0*T2 + 0*H3 + 0*PR3 + 0*CR3 
 
+MS1 ~ ParCollege + ParAAVOC + BlackE + LatinxE + OtherE
+BlackProt ~ BlackE
+Catholic ~ LatinxE
+BlackProt + MainProt + Catholic ~ OtherE
+College + AAVOC ~ ParCollege + ParAAVOC + Age + MS1
+Inc3 ~ MS1
+ParRit ~ ParCollege + ParAAVOC
 
+PR3 ~ PR2_l + h3.1a*H2 + T2
+CR3 ~ CR2_l + H2 + h3.2a*T2
 
+H2 ~ MS1
+H3 ~ arH*H2
+T2 ~ MS1
 
-      BiG1 | l*t1
-   
-   BiG2 | k*t1
-   BiG2 | l*t2
+BiG1 | l*t1
+BiG2 | k*t1
+BiG2 | l*t2
+BiG3 | k*t1
+BiG3 | l*t2
+BiG4 | k*t1
+BiG4 | l*t2
 
-   BiG3 | k*t1
-   BiG3 | l*t2
-   
-   BiG4 | k*t1
-   BiG4 | l*t2
-   
+PR2 | pr1*t1 + pr2*t2 + pr3*t3 + pr4*t4 + pr5*t5 + pr6*t6
+PR3 | pr1*t1 + pr2*t2 + pr3*t3 + pr4*t4 + pr5*t5 + pr6*t6
 
-   
-   Catholic ~~ MainProt + BlackProt
-   MainProt ~~ BlackProt
-      AAVOC ~~ College
+CR2 | cr1*t1 + cr2*t2 + cr3*t3 + cr4*t4 + cr5*t5 + cr6*t6
+CR3 | cr1*t1 + cr2*t2 + cr3*t3 + cr4*t4 + cr5*t5 + cr6*t6
 
+H2 | hth1*t1 + hth2*t2 + hth3*t3 + hth4*t4
+H3 | hth1*t1 + hth2*t2 + hth3*t3 + hth4*t4
+
+Catholic ~~ MainProt + BlackProt
+MainProt ~~ BlackProt
 Inc3 ~~ College
-
-   "
-
-
-base_nest_fit_ord <- lavaan.mi::sem.mi(base_nest_ord, mice.imp, 
-                                      estimator = "WLSMV", parameterization = "theta",
-                                      meanstructure = T, ordered = c("BiG1", "BiG2", "BiG3", "BiG4", "ParRit", "PR2", 
-                                                                     "PR3", "CR2", "CR3", "H2", "H3", "T2", "PST"),
-                                      missing = "listwise",  control = list(iter.max = 10e5))
-# H1 paths added 
-
-h1_nest_ord <-"
-
-  
-PST_l =~ PST
-PST ~~ 0*PST
-
-   BiG1 ~ Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE + OtherE + ParRit
-   BiG2 ~ Male + BlackProt + Catholic + MainProt   + BlackE + LatinxE + OtherE + ParRit
-   BiG3 ~ Male + BlackProt + Catholic + MainProt + BlackE + LatinxE + OtherE + ParRit
-   BiG4 ~ Age + Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE  + OtherE +
-   Inc3 + ParRit + College + AAVOC + PST_l
- 
-     eta_BiG =~ BiG1 + 1*BiG2 + 1*BiG3 + 1*BiG4
-
-   BiG2 ~ BiG1 + MS1
-   BiG3 ~ ar3*BiG2 + MS1+ 0*H2 + 0*T2 + PR2_l + CR2_l 
-   BiG4 ~ ar4*BiG3 + MS1 + 0*H2 + 0*T2 + 0*H3 + 0*PR3 +  0*CR3 
-
-  # Misc
- 
-  MS1 ~ ParCollege + ParAAVOC + BlackE + LatinxE + OtherE
-  BlackProt ~ BlackE
-  Catholic ~ LatinxE
-  BlackProt + MainProt + Catholic ~ OtherE
- 
-  College + AAVOC ~ ParCollege + ParAAVOC + Age + MS1
-  Inc3 ~ MS1
-  ParRit ~ ParCollege + ParAAVOC
-
-
-  # PR
-
-PR2_l =~ PR2
-PR2 ~~ 0*PR2
-  
-PR3 ~  PR2_l + h3.1a*H2 + T2
-
-# CR
-CR2_l =~ CR2
-CR2 ~~ 0*CR2
-
-CR3 ~ CR2_l + H2 + h3.2a*T2
-
-
-
-
-    # H
- 
-   H2 ~ MS1
-   H3 ~ arH*H2
-      # T
- 
-  T2 ~ MS1
- 
-
-
-      BiG1 | l*t1
-   
-   BiG2 | k*t1
-   BiG2 | l*t2
-
-   BiG3 | k*t1
-   BiG3 | l*t2
-   
-   BiG4 | k*t1
-   BiG4 | l*t2
-   
-      
-   BiG1 ~ 0*1
-   BiG2 ~ NA*1
-   BiG3 ~ NA*1
-   BiG4 ~ NA*1
-
-   PR2 | pr1*t1
-   PR2 | pr2*t2
-   PR2 | pr3*t3
-   PR2 | pr4*t4
-   PR2 | pr5*t5
-   PR2 | pr6*t6
-   
-   PR3 | pr1*t1
-   PR3 | pr2*t2
-   PR3 | pr3*t3
-   PR3 | pr4*t4
-   PR3 | pr5*t5
-   PR3 | pr6*t6
-
-   
-   CR2 | cr1*t1
-   CR2 | cr2*t2
-   CR2 | cr3*t3
-   CR2 | cr4*t4
-   CR2 | cr5*t5
-   CR2 | cr6*t6
-   
-   CR3 | cr1*t1
-   CR3 | cr2*t2
-   CR3 | cr3*t3
-   CR3 | cr4*t4
-   CR3 | cr5*t5
-   CR3 | cr6*t6
-
-   
-   H2 | hth1*t1
-   H2 | hth2*t2
-   H2 | hth3*t3
-   H2 | hth4*t4
-   
-   H3 | hth1*t1
-   H3 | hth2*t2
-   H3 | hth3*t3
-   H3 | hth4*t4
-   
-
-   
-   PR2 ~ 0*1
-   PR3 ~ NA*1
-   
-   CR2 ~ 0*1
-   CR3 ~ NA*1
-   
-   H2 ~ 0*1
-   H3 ~ NA*1
-   
-
-
-   "
-
- h1_nest_fit_ord <- lavaan.mi::sem.mi(h1_nest_ord, mice.imp, 
-                                                      estimator = "WLSMV", parameterization = "theta",
-                                                      meanstructure = T, ordered = c("BiG1", "BiG2", "BiG3", "BiG4", "ParRit", "PR2", 
-                                                                                     "PR3", "CR2", "CR3", "H2", "H3", "T2", "PST"),
-                                                      missing = "listwise",  control = list(iter.max = 10e5))
-
-# H2.1 paths added 
-
-h2.1_nest_ord <-"
-
-  PST_l =~ PST
-PST ~~ 0*PST
-
-   BiG1 ~ Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE + OtherE + ParRit
-   BiG2 ~ Male + BlackProt + Catholic + MainProt   + BlackE + LatinxE + OtherE + ParRit
-   BiG3 ~ Male + BlackProt + Catholic + MainProt + BlackE + LatinxE + OtherE + ParRit
-   BiG4 ~ Age + Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE  + OtherE +
-   Inc3 + ParRit + College + AAVOC + PST_l
- 
-     eta_BiG =~ BiG1 + 1*BiG2 + 1*BiG3 + 1*BiG4
-
-   BiG2 ~ BiG1 + MS1
-   BiG3 ~ ar3*BiG2 + MS1+ H2 + 0*T2 + PR2_l + CR2_l 
-   BiG4 ~ ar4*BiG3 + MS1 + H2 + 0*T2 + H3 + 0*PR3 +  0*CR3 
-
-  # Misc
- 
-  MS1 ~ ParCollege + ParAAVOC + BlackE + LatinxE + OtherE
-  BlackProt ~ BlackE
-  Catholic ~ LatinxE
-  BlackProt + MainProt + Catholic ~ OtherE
- 
-  College + AAVOC ~ ParCollege + ParAAVOC + Age + MS1
-  Inc3 ~ MS1
-  ParRit ~ ParCollege + ParAAVOC
-
-
-  # PR
-
-PR2_l =~ PR2
-PR2 ~~ 0*PR2
-  
-PR3 ~  PR2_l + h3.1a*H2 + T2
-
-# CR
-CR2_l =~ CR2
-CR2 ~~ 0*CR2
-
-CR3 ~ CR2_l + H2 + h3.2a*T2
-
-
-
-
-    # H
- 
-   H2 ~ MS1
-   H3 ~ arH*H2
-      # T
- 
-  T2 ~ MS1
- 
-
-
-      BiG1 | l*t1
-   
-   BiG2 | k*t1
-   BiG2 | l*t2
-
-   BiG3 | k*t1
-   BiG3 | l*t2
-   
-   BiG4 | k*t1
-   BiG4 | l*t2
-   
-      
-   BiG1 ~ 0*1
-   BiG2 ~ NA*1
-   BiG3 ~ NA*1
-   BiG4 ~ NA*1
-
-   PR2 | pr1*t1
-   PR2 | pr2*t2
-   PR2 | pr3*t3
-   PR2 | pr4*t4
-   PR2 | pr5*t5
-   PR2 | pr6*t6
-   
-   PR3 | pr1*t1
-   PR3 | pr2*t2
-   PR3 | pr3*t3
-   PR3 | pr4*t4
-   PR3 | pr5*t5
-   PR3 | pr6*t6
-
-   
-   CR2 | cr1*t1
-   CR2 | cr2*t2
-   CR2 | cr3*t3
-   CR2 | cr4*t4
-   CR2 | cr5*t5
-   CR2 | cr6*t6
-   
-   CR3 | cr1*t1
-   CR3 | cr2*t2
-   CR3 | cr3*t3
-   CR3 | cr4*t4
-   CR3 | cr5*t5
-   CR3 | cr6*t6
-
-   
-   H2 | hth1*t1
-   H2 | hth2*t2
-   H2 | hth3*t3
-   H2 | hth4*t4
-   
-   H3 | hth1*t1
-   H3 | hth2*t2
-   H3 | hth3*t3
-   H3 | hth4*t4
-   
-
-   
-   PR2 ~ 0*1
-   PR3 ~ NA*1
-   
-   CR2 ~ 0*1
-   CR3 ~ NA*1
-   
-   H2 ~ 0*1
-   H3 ~ NA*1
-   
-
-
-   "
-
-h2.1_nest_fit_ord <- lavaan.mi::sem.mi(h2.1_nest_ord, mice.imp, 
-                                     estimator = "WLSMV", parameterization = "theta",
-                                     meanstructure = T, ordered = c("BiG1", "BiG2", "BiG3", "BiG4", "ParRit", "PR2", 
-                                                                    "PR3", "CR2", "CR3", "H2", "H3", "T2", "PST"),
-                                     missing = "listwise",  control = list(iter.max = 10e5))
-
-# H2.2 paths added 
-
-h2.2_nest_ord <-"
-
-  PST_l =~ PST
-PST ~~ 0*PST
-
-   BiG1 ~ Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE + OtherE + ParRit
-   BiG2 ~ Male + BlackProt + Catholic + MainProt   + BlackE + LatinxE + OtherE + ParRit
-   BiG3 ~ Male + BlackProt + Catholic + MainProt + BlackE + LatinxE + OtherE + ParRit
-   BiG4 ~ Age + Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE  + OtherE +
-   Inc3 + ParRit + College + AAVOC + PST_l
- 
-     eta_BiG =~ BiG1 + 1*BiG2 + 1*BiG3 + 1*BiG4
-
-   BiG2 ~ BiG1 + MS1
-   BiG3 ~ ar3*BiG2 + MS1+ H2 + T2 + PR2_l + CR2_l 
-   BiG4 ~ ar4*BiG3 + MS1 + H2 + T2 + H3 + 0*PR3 +  0*CR3 
-
-  # Misc
- 
-  MS1 ~ ParCollege + ParAAVOC + BlackE + LatinxE + OtherE
-  BlackProt ~ BlackE
-  Catholic ~ LatinxE
-  BlackProt + MainProt + Catholic ~ OtherE
- 
-  College + AAVOC ~ ParCollege + ParAAVOC + Age + MS1
-  Inc3 ~ MS1
-  ParRit ~ ParCollege + ParAAVOC
-
-
-  # PR
-
-PR2_l =~ PR2
-PR2 ~~ 0*PR2
-  
-PR3 ~  PR2_l + h3.1a*H2 + T2
-
-# CR
-CR2_l =~ CR2
-CR2 ~~ 0*CR2
-
-CR3 ~ CR2_l + H2 + h3.2a*T2
-
-
-
-
-    # H
- 
-   H2 ~ MS1
-   H3 ~ arH*H2
-      # T
- 
-  T2 ~ MS1
- 
-
-
-      BiG1 | l*t1
-   
-   BiG2 | k*t1
-   BiG2 | l*t2
-
-   BiG3 | k*t1
-   BiG3 | l*t2
-   
-   BiG4 | k*t1
-   BiG4 | l*t2
-   
-      
-   BiG1 ~ 0*1
-   BiG2 ~ NA*1
-   BiG3 ~ NA*1
-   BiG4 ~ NA*1
-
-   PR2 | pr1*t1
-   PR2 | pr2*t2
-   PR2 | pr3*t3
-   PR2 | pr4*t4
-   PR2 | pr5*t5
-   PR2 | pr6*t6
-   
-   PR3 | pr1*t1
-   PR3 | pr2*t2
-   PR3 | pr3*t3
-   PR3 | pr4*t4
-   PR3 | pr5*t5
-   PR3 | pr6*t6
-
-   
-   CR2 | cr1*t1
-   CR2 | cr2*t2
-   CR2 | cr3*t3
-   CR2 | cr4*t4
-   CR2 | cr5*t5
-   CR2 | cr6*t6
-   
-   CR3 | cr1*t1
-   CR3 | cr2*t2
-   CR3 | cr3*t3
-   CR3 | cr4*t4
-   CR3 | cr5*t5
-   CR3 | cr6*t6
-
-   
-   H2 | hth1*t1
-   H2 | hth2*t2
-   H2 | hth3*t3
-   H2 | hth4*t4
-   
-   H3 | hth1*t1
-   H3 | hth2*t2
-   H3 | hth3*t3
-   H3 | hth4*t4
-   
-
-   
-   PR2 ~ 0*1
-   PR3 ~ NA*1
-   
-   CR2 ~ 0*1
-   CR3 ~ NA*1
-   
-   H2 ~ 0*1
-   H3 ~ NA*1
-   
-   "
-
-h2.2_nest_fit_ord <- lavaan.mi::sem.mi(h2.2_nest_ord, mice.imp, 
-                                       estimator = "WLSMV", parameterization = "theta",
-                                       meanstructure = T, ordered = c("BiG1", "BiG2", "BiG3", "BiG4", "ParRit", "PR2", 
-                                                                      "PR3", "CR2", "CR3", "H2", "H3", "T2", "PST"),
-                                       missing = "listwise",  control = list(iter.max = 10e5))
-
-
-# H3.1 paths added 
-
-h3.1_nest_ord <-"
-
-     PST_l =~ PST
-PST ~~ 0*PST
-
-   BiG1 ~ Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE + OtherE + ParRit
-   BiG2 ~ Male + BlackProt + Catholic + MainProt   + BlackE + LatinxE + OtherE + ParRit
-   BiG3 ~ Male + BlackProt + Catholic + MainProt + BlackE + LatinxE + OtherE + ParRit
-   BiG4 ~ Age + Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE  + OtherE +
-   Inc3 + ParRit + College + AAVOC + PST_l
- 
-     eta_BiG =~ BiG1 + 1*BiG2 + 1*BiG3 + 1*BiG4
-
-   BiG2 ~ BiG1 + MS1
-   BiG3 ~ ar3*BiG2 + MS1+ H2 + T2 + PR2_l + CR2_l 
-   BiG4 ~ ar4*BiG3 + MS1 + H2 + T2 + H3 + 0*PR3 +  CR3 
-
-  # Misc
- 
-  MS1 ~ ParCollege + ParAAVOC + BlackE + LatinxE + OtherE
-  BlackProt ~ BlackE
-  Catholic ~ LatinxE
-  BlackProt + MainProt + Catholic ~ OtherE
- 
-  College + AAVOC ~ ParCollege + ParAAVOC + Age + MS1
-  Inc3 ~ MS1
-  ParRit ~ ParCollege + ParAAVOC
-
-
-  # PR
-
-PR2_l =~ PR2
-PR2 ~~ 0*PR2
-  
-PR3 ~  PR2_l + h3.1a*H2 + T2
-
-# CR
-CR2_l =~ CR2
-CR2 ~~ 0*CR2
-
-CR3 ~ CR2_l + H2 + h3.2a*T2
-
-
-
-
-    # H
- 
-   H2 ~ MS1
-   H3 ~ arH*H2
-      # T
- 
-  T2 ~ MS1
- 
-
-
-      BiG1 | l*t1
-   
-   BiG2 | k*t1
-   BiG2 | l*t2
-
-   BiG3 | k*t1
-   BiG3 | l*t2
-   
-   BiG4 | k*t1
-   BiG4 | l*t2
-   
-      
-   BiG1 ~ 0*1
-   BiG2 ~ NA*1
-   BiG3 ~ NA*1
-   BiG4 ~ NA*1
-
-   PR2 | pr1*t1
-   PR2 | pr2*t2
-   PR2 | pr3*t3
-   PR2 | pr4*t4
-   PR2 | pr5*t5
-   PR2 | pr6*t6
-   
-   PR3 | pr1*t1
-   PR3 | pr2*t2
-   PR3 | pr3*t3
-   PR3 | pr4*t4
-   PR3 | pr5*t5
-   PR3 | pr6*t6
-
-   
-   CR2 | cr1*t1
-   CR2 | cr2*t2
-   CR2 | cr3*t3
-   CR2 | cr4*t4
-   CR2 | cr5*t5
-   CR2 | cr6*t6
-   
-   CR3 | cr1*t1
-   CR3 | cr2*t2
-   CR3 | cr3*t3
-   CR3 | cr4*t4
-   CR3 | cr5*t5
-   CR3 | cr6*t6
-
-   
-   H2 | hth1*t1
-   H2 | hth2*t2
-   H2 | hth3*t3
-   H2 | hth4*t4
-   
-   H3 | hth1*t1
-   H3 | hth2*t2
-   H3 | hth3*t3
-   H3 | hth4*t4
-   
-
-   
-   PR2 ~ 0*1
-   PR3 ~ NA*1
-   
-   CR2 ~ 0*1
-   CR3 ~ NA*1
-   
-   H2 ~ 0*1
-   H3 ~ NA*1
-   
-
-   "
-h3.1_nest_fit_ord <- lavaan.mi::sem.mi(h3.1_nest_ord, mice.imp, 
-                                       estimator = "WLSMV", parameterization = "theta",
-                                       meanstructure = T, ordered = c("BiG1", "BiG2", "BiG3", "BiG4", "ParRit", "PR2", 
-                                                                      "PR3", "CR2", "CR3", "H2", "H3", "T2", "PST"),
-                                       missing = "listwise",  control = list(iter.max = 10e5))
-
-
-# H3.2 paths added 
-
-
-
-h3.2_nest_fit_ord <- full_ordinal_fit
-
-
-
-# H1 paths removed 
-
-h3.2_nest_h1dropped_ord <-"
-
- 
-PST_l =~ PST
-PST ~~ 0*PST
-
-   BiG1 ~ Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE + OtherE + ParRit
-   BiG2 ~ Male + BlackProt + Catholic + MainProt   + BlackE + LatinxE + OtherE + ParRit
-   BiG3 ~ Male + BlackProt + Catholic + MainProt + BlackE + LatinxE + OtherE + ParRit
-   BiG4 ~ Age + Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE  + OtherE +
-   Inc3 + ParRit + College + AAVOC + PST_l
- 
-     eta_BiG =~ BiG1 + 1*BiG2 + 1*BiG3 + 1*BiG4
-
-   BiG2 ~ BiG1 + 0*MS1
-   BiG3 ~ ar3*BiG2 + 0*MS1+ h2.1a*H2 +h2.2a*T2 + PR2_l + CR2_l 
-   BiG4 ~ ar4*BiG3 + 0*MS1 + h2.1b*H2 + h2.2b*T2 + h2.1d*H3 + h3.2b*PR3 +  h3.1b*CR3 
-
-  # Misc
- 
-  MS1 ~ ParCollege + ParAAVOC + BlackE + LatinxE + OtherE
-  BlackProt ~ BlackE
-  Catholic ~ LatinxE
-  BlackProt + MainProt + Catholic ~ OtherE
- 
-  College + AAVOC ~ ParCollege + ParAAVOC + Age + MS1
-  Inc3 ~ MS1
-  ParRit ~ ParCollege + ParAAVOC
-
-
-  # PR
-
-PR2_l =~ PR2
-PR2 ~~ 0*PR2
-  
-PR3 ~  PR2_l + h3.1a*H2 + T2
-
-# CR
-CR2_l =~ CR2
-CR2 ~~ 0*CR2
-
-CR3 ~ CR2_l + H2 + h3.2a*T2
-
-
-
-
-    # H
- 
-   H2 ~ MS1
-   H3 ~ arH*H2
-      # T
- 
-  T2 ~ MS1
- 
- 
-  
-## MS1 -> BiG2 -> BiG3
- 
-ms1_big3 := h1a*ar3
- 
-## MS1 -> BiG3 -> BiG4
- 
-ms1_big4 := h1b*ar4
- 
-## H2 -> BiG3 -> BiG4
- 
-h2_big4 := h2.1a*ar4
- 
-## T2 -> BiG3 -> BiG4
- 
-t2_big4 := h2.2a*ar4
- 
-## H2 -> H3 -> BiG4
- 
-h2_h3_big4 := arH*h2.1d
- 
-h1a_ := h1a
-h1b_ := h1b
-h1c_ := h1c
- 
- 
-## H2 -> PR3 -> BiG4
- 
-h3.1indirect := h3.1a*h3.1b
-h3.1direct := h2.1b
- 
-## T2 -> CR3 -> BiG4
- 
-h3.2indirect := h3.2a*h3.2b
-h3.2direct := h2.2b
-
-
-      BiG1 | l*t1
-   
-   BiG2 | k*t1
-   BiG2 | l*t2
-
-   BiG3 | k*t1
-   BiG3 | l*t2
-   
-   BiG4 | k*t1
-   BiG4 | l*t2
-   
-      
-   BiG1 ~ 0*1
-   BiG2 ~ NA*1
-   BiG3 ~ NA*1
-   BiG4 ~ NA*1
-
-   PR2 | pr1*t1
-   PR2 | pr2*t2
-   PR2 | pr3*t3
-   PR2 | pr4*t4
-   PR2 | pr5*t5
-   PR2 | pr6*t6
-   
-   PR3 | pr1*t1
-   PR3 | pr2*t2
-   PR3 | pr3*t3
-   PR3 | pr4*t4
-   PR3 | pr5*t5
-   PR3 | pr6*t6
-
-   
-   CR2 | cr1*t1
-   CR2 | cr2*t2
-   CR2 | cr3*t3
-   CR2 | cr4*t4
-   CR2 | cr5*t5
-   CR2 | cr6*t6
-   
-   CR3 | cr1*t1
-   CR3 | cr2*t2
-   CR3 | cr3*t3
-   CR3 | cr4*t4
-   CR3 | cr5*t5
-   CR3 | cr6*t6
-
-   
-   H2 | hth1*t1
-   H2 | hth2*t2
-   H2 | hth3*t3
-   H2 | hth4*t4
-   
-   H3 | hth1*t1
-   H3 | hth2*t2
-   H3 | hth3*t3
-   H3 | hth4*t4
-   
-
-   
-   PR2 ~ 0*1
-   PR3 ~ NA*1
-   
-   CR2 ~ 0*1
-   CR3 ~ NA*1
-   
-   H2 ~ 0*1
-   H3 ~ NA*1
-
-   "
-
-h3.2_nest_h1dropped_ord_fit <- lavaan.mi::sem.mi(h3.2_nest_h1dropped_ord, mice.imp, 
-                                       estimator = "WLSMV", parameterization = "theta",
-                                       meanstructure = T, ordered = c("BiG1", "BiG2", "BiG3", "BiG4", "ParRit", "PR2", 
-                                                                      "PR3", "CR2", "CR3", "H2", "H3", "T2", "PST"),
-                                       missing = "listwise",  control = list(iter.max = 10e5))
-
-
-
-# H2.1 paths removed 
-
-h3.2_nest_h1_h2.1_dropped <-"
-
-   BiG1 ~ Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE + OtherE + ParRit
-   BiG2 ~ Male + BlackProt + Catholic + MainProt   + BlackE + LatinxE + OtherE + ParRit
-   BiG3 ~ Male + BlackProt + Catholic + MainProt + BlackE + LatinxE + OtherE + ParRit
-   BiG4 ~ Age + Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE  + OtherE +
-   Inc3 + ParRit + College + AAVOC + PST
- 
-   eta_BiG =~ BiG1 + 1*BiG2 + 1*BiG3 + 1*BiG4
-
-   BiG2 ~ BiG1 + 0*MS1
-   BiG3 ~ ar3*BiG2 + 0*MS1+ 0*H2 +h2.2a*T2 + PR2 + CR2
-   BiG4 ~ ar4*BiG3 + 0*MS1 + 0*H2 + h2.2b*T2 + 0*H3 + h3.2b*PR3 +  h3.1b*CR3 
-
-  # Misc
- 
-  MS1 ~ ParCollege + ParAAVOC + BlackE + LatinxE + OtherE
-  BlackProt ~ BlackE
-  Catholic ~ LatinxE
-  BlackProt + MainProt + Catholic ~ OtherE
- 
-  College + AAVOC ~ ParCollege + ParAAVOC + Age + MS1
-  Inc3 ~ MS1
-  ParRit ~ ParCollege + ParAAVOC
-
-PR3 ~  PR2 + h3.1a*H2 + T2
-
-# CR
-CR3 ~ CR2 + H2 + h3.2a*T2
-
-
-   "
-
-h3.2_nest_h1_h2.1_dropped_fit <- lavaan::sem(model = h3.2_nest_h1_h2.1_dropped, data = df_ml, 
-                                             estimator = "MLR",
-                                             meanstructure = T,
-                                             missing = "fiml", std.lv = F)
-
-summary(h3.2_nest_h1_h2.1_dropped_fit, std = T, fit = T)
-
-# H2.2 paths removed 
-
-h3.2_nest_h1_h2.2_dropped <-"
-
-   BiG1 ~ Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE + OtherE + ParRit
-   BiG2 ~ Male + BlackProt + Catholic + MainProt   + BlackE + LatinxE + OtherE + ParRit
-   BiG3 ~ Male + BlackProt + Catholic + MainProt + BlackE + LatinxE + OtherE + ParRit
-   BiG4 ~ Age + Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE  + OtherE +
-   Inc3 + ParRit + College + AAVOC + PST
- 
-   eta_BiG =~ BiG1 + 1*BiG2 + 1*BiG3 + 1*BiG4
-
-   BiG2 ~ BiG1 + 0*MS1
-   BiG3 ~ ar3*BiG2 + 0*MS1+ h2.1a*H2 + 0*T2 + PR2 + CR2
-   BiG4 ~ ar4*BiG3 + 0*MS1 + h2.1b*H2 + 0*T2 + h2.1d*H3 + h3.2b*PR3 +  h3.1b*CR3 
-
-  # Misc
- 
-  MS1 ~ ParCollege + ParAAVOC + BlackE + LatinxE + OtherE
-  BlackProt ~ BlackE
-  Catholic ~ LatinxE
-  BlackProt + MainProt + Catholic ~ OtherE
- 
-  College + AAVOC ~ ParCollege + ParAAVOC + Age + MS1
-  Inc3 ~ MS1
-  ParRit ~ ParCollege + ParAAVOC
-
-PR3 ~  PR2 + h3.1a*H2 + T2
-
-# CR
-CR3 ~ CR2 + H2 + h3.2a*T2
-
-
-   "
-
-h3.2_nest_h1_h2.2_dropped_fit <- lavaan::sem(model = h3.2_nest_h1_h2.2_dropped, data = df_ml, 
-                                             estimator = "MLR",
-                                             meanstructure = T,
-                                             missing = "fiml", std.lv = F)
-
-
-# H2.2 paths removed 
-
-h3.2_nest_h1_h3.1_dropped <-"
-
-   BiG1 ~ Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE + OtherE + ParRit
-   BiG2 ~ Male + BlackProt + Catholic + MainProt   + BlackE + LatinxE + OtherE + ParRit
-   BiG3 ~ Male + BlackProt + Catholic + MainProt + BlackE + LatinxE + OtherE + ParRit
-   BiG4 ~ Age + Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE  + OtherE +
-   Inc3 + ParRit + College + AAVOC + PST
- 
-   eta_BiG =~ BiG1 + 1*BiG2 + 1*BiG3 + 1*BiG4
-
-   BiG2 ~ BiG1 + 0*MS1
-   BiG3 ~ ar3*BiG2 + 0*MS1+ h2.1a*H2 +h2.2a*T2 + PR2 + CR2
-   BiG4 ~ ar4*BiG3 + 0*MS1 + h2.1b*H2 + h2.2b*T2 + h2.1d*H3 + h3.2b*PR3 +  0*CR3 
-
-  # Misc
- 
-  MS1 ~ ParCollege + ParAAVOC + BlackE + LatinxE + OtherE
-  BlackProt ~ BlackE
-  Catholic ~ LatinxE
-  BlackProt + MainProt + Catholic ~ OtherE
- 
-  College + AAVOC ~ ParCollege + ParAAVOC + Age + MS1
-  Inc3 ~ MS1
-  ParRit ~ ParCollege + ParAAVOC
-
-PR3 ~  PR2 + h3.1a*H2 + T2
-
-# CR
-CR3 ~ CR2 + H2 + h3.2a*T2
-
-
-   "
-
-h3.2_nest_h1_h3.1_dropped_fit <- lavaan::sem(model = h3.2_nest_h1_h3.1_dropped, data = df_ml, 
-                                             estimator = "MLR",
-                                             meanstructure = T,
-                                             missing = "fiml", std.lv = F)
-# H1, H2.2 and H3.1 paths removed 
-
-h3.2_nest_h1_h2.2_h3.1_dropped <-"
-
-   BiG1 ~ Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE + OtherE + ParRit
-   BiG2 ~ Male + BlackProt + Catholic + MainProt   + BlackE + LatinxE + OtherE + ParRit
-   BiG3 ~ Male + BlackProt + Catholic + MainProt + BlackE + LatinxE + OtherE + ParRit
-   BiG4 ~ Age + Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE  + OtherE +
-   Inc3 + ParRit + College + AAVOC + PST
- 
-   eta_BiG =~ BiG1 + 1*BiG2 + 1*BiG3 + 1*BiG4
-
-   BiG2 ~ BiG1 + 0*MS1
-   BiG3 ~ ar3*BiG2 + 0*MS1+ h2.1a*H2 +0*T2 + PR2 + CR2
-   BiG4 ~ ar4*BiG3 + 0*MS1 + h2.1b*H2 + 0*T2 + h2.1d*H3 + h3.2b*PR3 +  0*CR3 
-
-  # Misc
- 
-  MS1 ~ ParCollege + ParAAVOC + BlackE + LatinxE + OtherE
-  BlackProt ~ BlackE
-  Catholic ~ LatinxE
-  BlackProt + MainProt + Catholic ~ OtherE
- 
-  College + AAVOC ~ ParCollege + ParAAVOC + Age + MS1
-  Inc3 ~ MS1
-  ParRit ~ ParCollege + ParAAVOC
-
-PR3 ~  PR2 + h3.1a*H2 + T2
-
-# CR
-CR3 ~ CR2 + H2 + h3.2a*T2
-
-
-   "
-
-h3.2_nest_h1_h2.2_h3.1_dropped_fit <- lavaan::sem(model = h3.2_nest_h1_h2.2_h3.1_dropped, data = df_ml, 
-                                                  estimator = "MLR",
-                                                  meanstructure = T,
-                                                  missing = "fiml", std.lv = F)
-
-
-anova(base_nest_fit_ord, h1_nest_fit_ord, h2.1_nest_fit_ord, 
-      h2.2_nest_fit_ord, h3.1_nest_fit_ord, h3.2_nest_fit_ord)
-
-
-
-comp_ordinal <- compareFit(base_nest_fit_ord, h1_nest_fit_ord, h2.1_nest_fit_ord, 
-                           h2.2_nest_fit_ord, h3.1_nest_fit_ord, h3.2_nest_fit_ord)
-
-
-## MLE ------------------------------------------------------------------
-
-
-# No hypothesized paths present 
-
-base_nest <- "
-
-   BiG1 ~ Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE + OtherE + ParRit
-   BiG2 ~ Male + BlackProt + Catholic + MainProt   + BlackE + LatinxE + OtherE + ParRit
-   BiG3 ~ Male + BlackProt + Catholic + MainProt + BlackE + LatinxE + OtherE + ParRit
-   BiG4 ~ Age + Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE  + OtherE +
-   Inc3 + ParRit + College + AAVOC + PST
- 
-   eta_BiG =~ BiG1 + 1*BiG2 + 1*BiG3 + 1*BiG4
-
-   BiG2 ~ BiG1 + 0*MS1
-   BiG3 ~ ar3*BiG2 + 0*MS1+ 0*H2 +0*T2 + PR2 + CR2
-   BiG4 ~ ar4*BiG3 + 0*MS1 + 0*H2 + 0*T2 + 0*H3 + 0*PR3 +  0*CR3 
-
-  # Misc
- 
-  MS1 ~ ParCollege + ParAAVOC + BlackE + LatinxE + OtherE
-  BlackProt ~ BlackE
-  Catholic ~ LatinxE
-  BlackProt + MainProt + Catholic ~ OtherE
- 
-  College + AAVOC ~ ParCollege + ParAAVOC + Age + MS1
-  Inc3 ~ MS1
-  ParRit ~ ParCollege + ParAAVOC
-
-PR3 ~  PR2 + 0*H2 + T2
-
-# CR
-CR3 ~ CR2 + H2 + 0*T2
-
-
-
-      
-
-
-   "
-
-base_nest_fit <- lavaan::sem(model = base_nest, data = df_ml, 
-            estimator = "MLR",
-            meanstructure = T,
-            missing = "fiml", std.lv = F, std.ov = F)
-
-summary(base_nest_fit, std = T, fit = T)
-
-# H1 paths added 
-
-h1_nest <-"
-
-   BiG1 ~ Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE + OtherE
-   BiG2 ~ Male + BlackProt + Catholic + MainProt   + BlackE + LatinxE + OtherE
-   BiG3 ~ Male + BlackProt + Catholic + MainProt + BlackE + LatinxE + OtherE
-   BiG4 ~ Age + Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE  + OtherE +
-   Inc3 + ParRit + College + AAVOC + PST
- 
-   eta_BiG =~ BiG1 + 1*BiG2 + 1*BiG3 + 1*BiG4
-
-   BiG2 ~ BiG1 + h1a*MS1
-   BiG3 ~ ar3*BiG2 + h1b*MS1+ 0*H2 +0*T2 + PR2 + CR2
-   BiG4 ~ ar4*BiG3 + h1c*MS1 + 0*H2 + 0*T2 + 0*H3 + 0*PR3 +  0*CR3 
-
-  # Misc
- 
-  MS1 ~ ParCollege + ParAAVOC + BlackE + LatinxE + OtherE
-  BlackProt ~ BlackE
-  Catholic ~ LatinxE
-  BlackProt + MainProt + Catholic ~ OtherE
- 
-  College + AAVOC ~ ParCollege + ParAAVOC + Age + MS1
-  Inc3 ~ MS1
-  ParRit ~ ParCollege + ParAAVOC
-
-PR3 ~  PR2 + 0*H2 + T2
-
-# CR
-CR3 ~ CR2 + H2 + 0*T2
-
-   "
-
-h1_nest_fit <- lavaan::sem(model = h1_nest, data = df_ml, 
-                                   estimator = "MLR",
-                                   meanstructure = T,
-                                   missing = "fiml", std.lv = F)
-summary(h1_nest_fit, std = T, fit = T)
-residuals(h1_nest_fit)
-
-anova(base_nest_fit, h1_nest_fit)
-
-# H2.1 paths added 
-
-h2.1_nest <-"
-
-   BiG1 ~ Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE + OtherE
-   BiG2 ~ Male + BlackProt + Catholic + MainProt   + BlackE + LatinxE + OtherE
-   BiG3 ~ Male + BlackProt + Catholic + MainProt + BlackE + LatinxE + OtherE
-   BiG4 ~ Age + Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE  + OtherE +
-   Inc3 + ParRit + College + AAVOC + PST
- 
-   eta_BiG =~ BiG1 + 1*BiG2 + 1*BiG3 + 1*BiG4
-
-   BiG2 ~ BiG1 + h1a*MS1
-   BiG3 ~ ar3*BiG2 + h1b*MS1+ h2.1a*H2 +0*T2 + PR2 + CR2
-   BiG4 ~ ar4*BiG3 + h1c*MS1 + h2.1b*H2 + 0*T2 + h2.1d*H3 + 0*PR3 +  0*CR3 
-
-  # Misc
- 
-  MS1 ~ ParCollege + ParAAVOC + BlackE + LatinxE + OtherE
-  BlackProt ~ BlackE
-  Catholic ~ LatinxE
-  BlackProt + MainProt + Catholic ~ OtherE
- 
-  College + AAVOC ~ ParCollege + ParAAVOC + Age + MS1
-  Inc3 ~ MS1
-  ParRit ~ ParCollege + ParAAVOC
-
-PR3 ~  PR2 + 0*H2 + T2
-
-# CR
-CR3 ~ CR2 + H2 + 0*T2
-
-
-   "
-
-h2.1_nest_fit <- lavaan::sem(model = h2.1_nest, data = df_ml, 
-                       estimator = "MLR",
-                       meanstructure = T,
-                       missing = "fiml", std.lv = F)
-summary(h2.1_nest_fit, std = T, fit = T)
-
-anova(base_nest_fit, h1_nest_fit, h2.1_nest_fit)
-
-# H2.2 paths added 
-
-h2.2_nest <-"
-
-   BiG1 ~ Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE + OtherE
-   BiG2 ~ Male + BlackProt + Catholic + MainProt   + BlackE + LatinxE + OtherE
-   BiG3 ~ Male + BlackProt + Catholic + MainProt + BlackE + LatinxE + OtherE
-   BiG4 ~ Age + Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE  + OtherE +
-   Inc3 + ParRit + College + AAVOC + PST
- 
-   eta_BiG =~ BiG1 + 1*BiG2 + 1*BiG3 + 1*BiG4
-
-   BiG2 ~ BiG1 + h1a*MS1
-   BiG3 ~ ar3*BiG2 + h1b*MS1+ h2.1a*H2 +h2.2a*T2 + PR2 + CR2
-   BiG4 ~ ar4*BiG3 + h1c*MS1 + h2.1b*H2 + h2.2b*T2 + h2.1d*H3 + 0*PR3 +  0*CR3 
-
-  # Misc
- 
-  MS1 ~ ParCollege + ParAAVOC + BlackE + LatinxE + OtherE
-  BlackProt ~ BlackE
-  Catholic ~ LatinxE
-  BlackProt + MainProt + Catholic ~ OtherE
- 
-  College + AAVOC ~ ParCollege + ParAAVOC + Age + MS1
-  Inc3 ~ MS1
-  ParRit ~ ParCollege + ParAAVOC
-
-PR3 ~  PR2 + 0*H2 + T2
-
-# CR
-CR3 ~ CR2 + H2 + 0*T2
-
-   "
-
-h2.2_nest_fit <- lavaan::sem(model = h2.2_nest, data = df_ml, 
-                         estimator = "MLR",
-                         meanstructure = T,
-                         missing = "fiml", std.lv = F)
-summary(h2.2_nest, std = T, fit = T)
-
-anova(base_nest_fit, h1_nest_fit, h2.1_nest_fit, h2.2_nest_fit)
-
-
-# H3.1 paths added 
-
-h3.1_nest <-"
-
-   BiG1 ~ Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE + OtherE
-   BiG2 ~ Male + BlackProt + Catholic + MainProt   + BlackE + LatinxE + OtherE
-   BiG3 ~ Male + BlackProt + Catholic + MainProt + BlackE + LatinxE + OtherE
-   BiG4 ~ Age + Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE  + OtherE +
-   Inc3 + ParRit + College + AAVOC + PST
- 
-   eta_BiG =~ BiG1 + 1*BiG2 + 1*BiG3 + 1*BiG4
-
-   BiG2 ~ BiG1 + h1a*MS1
-   BiG3 ~ ar3*BiG2 + h1b*MS1+ h2.1a*H2 +h2.2a*T2 + PR2 + CR2
-   BiG4 ~ ar4*BiG3 + h1c*MS1 + h2.1b*H2 + h2.2b*T2 + h2.1d*H3 + 0*PR3 +  h3.1b*CR3 
-
-  # Misc
- 
-  MS1 ~ ParCollege + ParAAVOC + BlackE + LatinxE + OtherE
-  BlackProt ~ BlackE
-  Catholic ~ LatinxE
-  BlackProt + MainProt + Catholic ~ OtherE
- 
-  College + AAVOC ~ ParCollege + ParAAVOC + Age + MS1
-  Inc3 ~ MS1
-  ParRit ~ ParCollege + ParAAVOC
-
-PR3 ~  PR2 + h3.1a*H2 + T2
-
-# CR
-CR3 ~ CR2 + H2 + 0*T2
-
-
-   "
-
-h3.1_nest_fit <- lavaan::sem(model = h3.1_nest, data = df_ml, 
-                         estimator = "MLR",
-                         meanstructure = T,
-                         missing = "fiml", std.lv = F)
-summary(h2.2_nest, std = T, fit = T)
-
-anova(base_nest_fit, h1_nest_fit, h2.1_nest_fit, h2.2_nest_fit, h3.1_nest_fit)
-
-# H3.2 paths added 
-
-h3.2_nest <-"
-
-   BiG1 ~ Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE + OtherE
-   BiG2 ~ Male + BlackProt + Catholic + MainProt   + BlackE + LatinxE + OtherE
-   BiG3 ~ Male + BlackProt + Catholic + MainProt + BlackE + LatinxE + OtherE
-   BiG4 ~ Age + Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE  + OtherE +
-   Inc3 + ParRit + College + AAVOC + PST
- 
-   eta_BiG =~ BiG1 + 1*BiG2 + 1*BiG3 + 1*BiG4
-
-   BiG2 ~ BiG1 + h1a*MS1
-   BiG3 ~ ar3*BiG2 + h1b*MS1+ h2.1a*H2 +h2.2a*T2 + PR2 + CR2
-   BiG4 ~ ar4*BiG3 + h1c*MS1 + h2.1b*H2 + h2.2b*T2 + h2.1d*H3 + h3.2b*PR3 +  h3.1b*CR3 
-
-  # Misc
- 
-  MS1 ~ ParCollege + ParAAVOC + BlackE + LatinxE + OtherE
-  BlackProt ~ BlackE
-  Catholic ~ LatinxE
-  BlackProt + MainProt + Catholic ~ OtherE
- 
-  College + AAVOC ~ ParCollege + ParAAVOC + Age + MS1
-  Inc3 ~ MS1
-  ParRit ~ ParCollege + ParAAVOC
-
-PR3 ~  PR2 + h3.1a*H2 + T2
-
-# CR
-CR3 ~ CR2 + H2 + h3.2a*T2
-
-
-   "
-
-h3.2_nest_fit <- lavaan::sem(model = h3.2_nest, data = df_ml, 
-                             estimator = "MLR",
-                             meanstructure = T,
-                             missing = "fiml", std.lv = F)
-
-summary(h3.2_nest_fit, std = T, fit = T)
-
-anova(base_nest_fit, h1_nest_fit, h2.1_nest_fit, 
-      h2.2_nest_fit, h3.1_nest_fit, h3.2_nest_fit)
-
-
-
-# H1 paths removed 
-
-h3.2_nest_h1dropped <-"
-
-   BiG1 ~ Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE + OtherE
-   BiG2 ~ Male + BlackProt + Catholic + MainProt   + BlackE + LatinxE + OtherE
-   BiG3 ~ Male + BlackProt + Catholic + MainProt + BlackE + LatinxE + OtherE
-   BiG4 ~ Age + Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE  + OtherE +
-   Inc3 + ParRit + College + AAVOC + PST
- 
-   eta_BiG =~ BiG1 + 1*BiG2 + 1*BiG3 + 1*BiG4
-
-   BiG2 ~ BiG1 + 0*MS1
-   BiG3 ~ ar3*BiG2 + 0*MS1+ h2.1a*H2 +h2.2a*T2 + PR2 + CR2
-   BiG4 ~ ar4*BiG3 + 0*MS1 + h2.1b*H2 + h2.2b*T2 + h2.1d*H3 + h3.2b*PR3 +  h3.1b*CR3 
-
-  # Misc
- 
-  MS1 ~ ParCollege + ParAAVOC + BlackE + LatinxE + OtherE
-  BlackProt ~ BlackE
-  Catholic ~ LatinxE
-  BlackProt + MainProt + Catholic ~ OtherE
- 
-  College + AAVOC ~ ParCollege + ParAAVOC + Age + MS1
-  Inc3 ~ MS1
-  ParRit ~ ParCollege + ParAAVOC
-
-PR3 ~  PR2 + h3.1a*H2 + T2
-
-# CR
-CR3 ~ CR2 + H2 + h3.2a*T2
-
-
-   "
-
-h3.2_nest_h1dropped_fit <- lavaan::sem(model = h3.2_nest_h1dropped, data = df_ml, 
-                             estimator = "MLR",
-                             meanstructure = T,
-                             missing = "fiml", std.lv = F)
-
-summary(h3.2_nest_h1dropped_fit, std = T, fit = T)
-
-# H2.1 paths removed 
-
-h3.2_nest_h1_h2.1_dropped <-"
-
-   BiG1 ~ Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE + OtherE
-   BiG2 ~ Male + BlackProt + Catholic + MainProt   + BlackE + LatinxE + OtherE
-   BiG3 ~ Male + BlackProt + Catholic + MainProt + BlackE + LatinxE + OtherE
-   BiG4 ~ Age + Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE  + OtherE +
-   Inc3 + ParRit + College + AAVOC + PST
- 
-   eta_BiG =~ BiG1 + 1*BiG2 + 1*BiG3 + 1*BiG4
-
-   BiG2 ~ BiG1 + 0*MS1
-   BiG3 ~ ar3*BiG2 + 0*MS1+ 0*H2 +h2.2a*T2 + PR2 + CR2
-   BiG4 ~ ar4*BiG3 + 0*MS1 + 0*H2 + h2.2b*T2 + 0*H3 + h3.2b*PR3 +  h3.1b*CR3 
-
-  # Misc
- 
-  MS1 ~ ParCollege + ParAAVOC + BlackE + LatinxE + OtherE
-  BlackProt ~ BlackE
-  Catholic ~ LatinxE
-  BlackProt + MainProt + Catholic ~ OtherE
- 
-  College + AAVOC ~ ParCollege + ParAAVOC + Age + MS1
-  Inc3 ~ MS1
-  ParRit ~ ParCollege + ParAAVOC
-
-PR3 ~  PR2 + h3.1a*H2 + T2
-
-# CR
-CR3 ~ CR2 + H2 + h3.2a*T2
-
-
-   "
-
-h3.2_nest_h1_h2.1_dropped_fit <- lavaan::sem(model = h3.2_nest_h1_h2.1_dropped, data = df_ml, 
-                                       estimator = "MLR",
-                                       meanstructure = T,
-                                       missing = "fiml", std.lv = F)
-
-summary(h3.2_nest_h1_h2.1_dropped_fit, std = T, fit = T)
-
-# H2.2 paths removed 
-
-h3.2_nest_h1_h2.2_dropped <-"
-
-   BiG1 ~ Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE + OtherE
-   BiG2 ~ Male + BlackProt + Catholic + MainProt   + BlackE + LatinxE + OtherE
-   BiG3 ~ Male + BlackProt + Catholic + MainProt + BlackE + LatinxE + OtherE
-   BiG4 ~ Age + Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE  + OtherE +
-   Inc3 + ParRit + College + AAVOC + PST
- 
-   eta_BiG =~ BiG1 + 1*BiG2 + 1*BiG3 + 1*BiG4
-
-   BiG2 ~ BiG1 + 0*MS1
-   BiG3 ~ ar3*BiG2 + 0*MS1+ h2.1a*H2 + 0*T2 + PR2 + CR2
-   BiG4 ~ ar4*BiG3 + 0*MS1 + h2.1b*H2 + 0*T2 + h2.1d*H3 + h3.2b*PR3 +  h3.1b*CR3 
-
-  # Misc
- 
-  MS1 ~ ParCollege + ParAAVOC + BlackE + LatinxE + OtherE
-  BlackProt ~ BlackE
-  Catholic ~ LatinxE
-  BlackProt + MainProt + Catholic ~ OtherE
- 
-  College + AAVOC ~ ParCollege + ParAAVOC + Age + MS1
-  Inc3 ~ MS1
-  ParRit ~ ParCollege + ParAAVOC
-
-PR3 ~  PR2 + h3.1a*H2 + T2
-
-# CR
-CR3 ~ CR2 + H2 + h3.2a*T2
-
-
-   "
-
-h3.2_nest_h1_h2.2_dropped_fit <- lavaan::sem(model = h3.2_nest_h1_h2.2_dropped, data = df_ml, 
-                                             estimator = "MLR",
-                                             meanstructure = T,
-                                             missing = "fiml", std.lv = F)
-
-summary(h3.2_nest_h1_h2.1_dropped_fit, std = T, fit = T)
-
-# H2.2 paths removed 
-
-h3.2_nest_h1_h3.1_dropped <-"
-
-   BiG1 ~ Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE + OtherE
-   BiG2 ~ Male + BlackProt + Catholic + MainProt   + BlackE + LatinxE + OtherE
-   BiG3 ~ Male + BlackProt + Catholic + MainProt + BlackE + LatinxE + OtherE
-   BiG4 ~ Age + Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE  + OtherE +
-   Inc3 + ParRit + College + AAVOC + PST
- 
-   eta_BiG =~ BiG1 + 1*BiG2 + 1*BiG3 + 1*BiG4
-
-   BiG2 ~ BiG1 + 0*MS1
-   BiG3 ~ ar3*BiG2 + 0*MS1+ h2.1a*H2 +h2.2a*T2 + PR2 + CR2
-   BiG4 ~ ar4*BiG3 + 0*MS1 + h2.1b*H2 + h2.2b*T2 + h2.1d*H3 + h3.2b*PR3 +  0*CR3 
-
-  # Misc
- 
-  MS1 ~ ParCollege + ParAAVOC + BlackE + LatinxE + OtherE
-  BlackProt ~ BlackE
-  Catholic ~ LatinxE
-  BlackProt + MainProt + Catholic ~ OtherE
- 
-  College + AAVOC ~ ParCollege + ParAAVOC + Age + MS1
-  Inc3 ~ MS1
-  ParRit ~ ParCollege + ParAAVOC
-
-PR3 ~  PR2 + h3.1a*H2 + T2
-
-# CR
-CR3 ~ CR2 + H2 + h3.2a*T2
-
-
-   "
-
-h3.2_nest_h1_h3.1_dropped_fit <- lavaan::sem(model = h3.2_nest_h1_h3.1_dropped, data = df_ml, 
-                                             estimator = "MLR",
-                                             meanstructure = T,
-                                             missing = "fiml", std.lv = F)
-# H1, H2.2 and H3.1 paths removed 
-
-h3.2_nest_h1_h2.2_h3.1_dropped <-"
-
-   BiG1 ~ Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE + OtherE
-   BiG2 ~ Male + BlackProt + Catholic + MainProt   + BlackE + LatinxE + OtherE
-   BiG3 ~ Male + BlackProt + Catholic + MainProt + BlackE + LatinxE + OtherE
-   BiG4 ~ Age + Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE  + OtherE +
-   Inc3 + ParRit + College + AAVOC + PST
- 
-   eta_BiG =~ BiG1 + 1*BiG2 + 1*BiG3 + 1*BiG4
-
-   BiG2 ~ BiG1 + 0*MS1
-   BiG3 ~ ar3*BiG2 + 0*MS1+ h2.1a*H2 +0*T2 + PR2 + CR2
-   BiG4 ~ ar4*BiG3 + 0*MS1 + h2.1b*H2 + 0*T2 + h2.1d*H3 + h3.2b*PR3 +  0*CR3 
-
-  # Misc
- 
-  MS1 ~ ParCollege + ParAAVOC + BlackE + LatinxE + OtherE
-  BlackProt ~ BlackE
-  Catholic ~ LatinxE
-  BlackProt + MainProt + Catholic ~ OtherE
- 
-  College + AAVOC ~ ParCollege + ParAAVOC + Age + MS1
-  Inc3 ~ MS1
-  ParRit ~ ParCollege + ParAAVOC
-
-PR3 ~  PR2 + h3.1a*H2 + T2
-
-# CR
-CR3 ~ CR2 + H2 + h3.2a*T2
-
-
-   "
-
-h3.2_nest_h1_h2.2_h3.1_dropped_fit <- lavaan::sem(model = h3.2_nest_h1_h2.2_h3.1_dropped, data = df_ml, 
-                                             estimator = "MLR",
-                                             meanstructure = T,
-                                             missing = "fiml", std.lv = F)
-
-comp_mle <- compareFit(base_nest_fit, h1_nest_fit, h2.1_nest_fit, 
-                   h2.2_nest_fit, h3.1_nest_fit, h3.2_nest_fit, 
-                   h3.2_nest_h1dropped_fit, h3.2_nest_h1_h2.1_dropped_fit,
-                   h3.2_nest_h1_h2.2_dropped_fit, h3.2_nest_h1_h3.1_dropped_fit,
-                   h3.2_nest_h1_h2.2_h3.1_dropped_fit)
-
-summary(comp_mle)
-
-
-
-# Reviewer's requests -----------------------------------------------------
-
-# 1. Remove the paths from BiG2 to MS1 and from BiG3 to MS1
-reviewer_model <- "
-
-
-
-   BiG4 ~ Age + Male + BlackProt + Catholic + MainProt  + BlackE + LatinxE  + OtherE +
-   Inc3 + ParRit + College + AAVOC + PST
- 
-   BiG4 ~ h1c*MS1 + h2.1b*H2 + h2.2b*T2 + h3.2b*PR3_l +  h3.1b*CR3_l 
-
-  # Misc
- 
-  MS1 ~ ParCollege + ParAAVOC + BlackE + LatinxE + OtherE
-  BlackProt ~ BlackE
-  Catholic ~ LatinxE
-  BlackProt + MainProt + Catholic ~ OtherE
- 
-  College + AAVOC ~ ParCollege + ParAAVOC + Age + MS1
-  Inc3 ~ MS1
-  ParRit ~ ParCollege + ParAAVOC
-
-
-  # PR
-
-PR2_l =~ PR2
-PR2 ~~ 0*PR2
-
-PR3_l =~ PR3
-PR3 ~~ 0*PR3
-  
-PR3_l ~  PR2_l + h3.1a*H2 + T2
-
-# CR
-CR2_l =~ CR2
-CR2 ~~ 0*CR2
-
-CR3_l =~ CR3
-CR3 ~~ 0*CR3
-
-CR3_l ~ CR2_l + H2 + h3.2a*T2
-
-    # H
- 
-   H2 ~ MS1
-   H3 ~ arH*H2
-   
-      # T
-  T2 ~ MS1
- 
-## H2 -> H3 -> BiG4
- 
-
- 
- 
- 
-## H2 -> PR3 -> BiG4
- 
-h3.1indirect := h3.1a*h3.1b
-h3.1direct := h2.1b
- 
-## T2 -> CR3 -> BiG4
- 
-h3.2indirect := h3.2a*h3.2b
-h3.2direct := h2.2b
-
-  
+ParRit ~~ CR2_l + CR3 + PR2_l + PR3
 "
 
-rev_fit <- lavaan.mi::sem.mi(reviewer_model, mice.imp, 
-                                      estimator = "WLSMV", parameterization = "theta",
-                                      meanstructure = T, ordered = c("BiG4", "ParRit", "PR2", 
-                                                                     "PR3", "CR2", "CR3", "H2", "H3", "T2"),
-                                      missing = "pairwise")
-summary(rev_fit, std = T)
-fitmeasures(rev_fit)
+# ---- 2) Activator: free blocks by name ----
+free_blocks <- function(model, blocks = character(0)) {
+  m <- model
+  if ("H1"   %in% blocks) m <- gsub("0\\*MS1","MS1", m)
+  if ("H2.1" %in% blocks) m <- gsub("0\\*H2","H2", m) |> gsub("0\\*H3","H3", x = _)
+  if ("H2.2" %in% blocks) m <- gsub("0\\*T2","T2", m)
+  if ("H3.1" %in% blocks) m <- gsub("0\\*PR3","PR3", m)
+  if ("H3.2" %in% blocks) m <- gsub("0\\*CR3","CR3", m)
+  m
+}
 
-r <- standardizedSolution.mi(rev_fit) %>% data.frame() 
-r[,5:10] <-  r[,5:10] %>% round(3)
-r %>% filter(op == "~") %>% filter(grepl("BiG", lhs)) %>% filter(grepl("BiG", rhs))
-r %>% filter(op == "~") %>% filter(grepl("BiG", lhs)) %>% filter(grepl("MS", rhs))
-r %>% filter(op == "~") %>% filter(grepl("H2", lhs)) %>% filter(grepl("MS", rhs))
-r %>% filter(op == "~") %>% filter(grepl("T2", lhs)) %>% filter(grepl("MS", rhs))
+# ---- 3) The 11 combinations ----
+combos <- list(
+  "H1"                                 = c("H1"),
+  "H1 + H2.1"                          = c("H1","H2.1"),
+  "H1 + H2.1 + H2.2"                   = c("H1","H2.1","H2.2"),
+  "H1 + H2.1 + H2.2 + H3.1"            = c("H1","H2.1","H2.2", "H3.1"),
+  "H1 + H2.1 + H2.2 + H3.1 + H3.2"     = c("H1","H2.1","H2.2", "H3.1", "H3.2"),
+  "H2.1 + H2.2 + H3.1 + H3.2"          = c("H2.1","H2.2", "H3.1", "H3.2"),
+  "H2.1 + H2.2 + H3.2"                 = c("H2.1","H2.2", "H3.2"),
+  "H2.1 + H3.1 + H3.2"                 = c("H2.1", "H3.1", "H3.2"),
+  "H2.2 + H3.1 + H3.2"                 = c("H2.1","H2.2", "H3.1", "H3.2"),
+  "H2.1 + H3.2"                        = c("H2.1", "H3.2")
+)
 
-r %>% filter(op == "~") %>% filter(grepl("H2", rhs)) %>% filter(grepl("PR", lhs))
-r %>% filter(op == "~") %>% filter(grepl("PR", rhs))
-r %>% filter(op == "~") %>% filter(grepl("CR", lhs))
-r %>% filter(op == "~") %>% filter(grepl("CR", rhs))
-r %>% filter(op == ":=") %>% filter(grepl("indirect", label))
-r %>% filter(op == ":=") %>% filter(grepl("sum", label))
-r %>% filter(op == ":=") 
+# ---- 4) Fit them all (same estimator/sample across models) ----
+fit_one <- function(model_string) lavaan.mi::sem.mi(
+  model_string, mice.imp,
+  estimator="WLSMV", parameterization="theta",
+  meanstructure=TRUE,
+  ordered=c("BiG1","BiG2","BiG3","BiG4","ParRit","PR2","PR3","CR2","CR3","H2","H3","T2","PST"),
+  missing="listwise", control=list(iter.max=10e5)
+)
+
+fits <- lapply(combos, function(b) fit_one(free_blocks(base_nest_ord, b)))
+
+# ---- 5) Pull scaled fit indices & make the table ----
+`%or%` <- function(a,b) if(!is.na(a)) a else b
+get_scaled <- function(fit){
+  fm <- fitmeasures(fit)
+  data.frame(
+    chisq = fm[["chisq.scaled"]] %or% fm[["chisq"]],
+    df    = fm[["df.scaled"]]    %or% fm[["df"]],
+    RMSEA = fm[["rmsea.scaled"]] %or% fm[["rmsea"]],
+    TLI   = fm[["tli.scaled"]]   %or% fm[["tli"]],
+    SRMR  = if(!is.na(fm[["srmr"]])) fm[["srmr"]] else fm[["srmr"]],
+    row.names=NULL
+  )
+}
+
+tab <- do.call(rbind, lapply(names(fits), function(nm){
+  out <- get_scaled(fits[[nm]])
+  cbind(Model = nm, out)
+}))
+
+# pretty formatting
+tab$chisq <- round(tab$chisq,0)
+tab$df    <- round(tab$df,0)
+tab$RMSEA <- sprintf("%.3f", tab$RMSEA)
+tab$TLI   <- sprintf("%.3f", tab$TLI)
+tab$SRMR  <- sprintf("%.3f", tab$SRMR)
+
+tab
+# openxlsx::write.xlsx(tab, "nested_11_models_scaled_fits.xlsx")
+
+library(dplyr)
+library(purrr)
+library(tibble)
+
+# Robustly fetch a parameter table from a lavaan.mi fit
+get_par_table <- function(fit) {
+  tryCatch({
+    as_tibble(lavaan::lavInspect(fit, "parTable"))
+  }, error = function(e1) {
+    tryCatch({
+      as_tibble(lavaan::parameterTable(fit))
+    }, error = function(e2) {
+      obj <- NULL
+      # try common slots in lavaan.mi
+      if (!is.null(fit@lavList)) obj <- fit@lavList[[1]]
+      if (is.null(obj) && !is.null(fit@fitList)) obj <- fit@fitList[[1]]
+      if (is.null(obj)) stop("Couldn't locate an underlying lavaan object.")
+      as_tibble(lavaan::parameterTable(obj))
+    })
+  })
+}
+
+# 1) All user-defined (':=') parameters per model in `fits`
+defined_by_model <- imap(
+  fits,
+  ~ parameterEstimates.mi(.x, asymptotic = TRUE) %>%
+    filter(lhs %in% c("BiG1", "BiG2", "BiG3", "BiG4")) %>% filter(op == "~") %>%
+    mutate(model_name = .y, .before = 1) %>%
+    select(model_name, lhs, op, rhs, est, se, z, pvalue, label)
+) %>% list_rbind()
 
 
-#H1
-
-full_ordinal_mi_params_r <- extract_defined_params_lavaanmi(rev_fit)
-
-hypothesis <-  "h1a_ + h1b_ + h1c_ + ms1_big3 + ms1_big4 < 0"
-
-full_ordinal_mi_eval_r <- restriktor::goric(full_ordinal_mi_params_r[["est"]], VCOV = full_ordinal_mi_params_r[["VCOV"]],
-                                          hypotheses = list(hypothesis), comparison = "complement")
-full_ordinal_mi_eval_r
-
-full_ordinal_mi_eval_ben_r <- benchmark(full_ordinal_mi_eval_r)
-
-# H2.1: 
-# H2 -> BiG4
-# If H1+, then:
-
-H2.1 <- "h3.1direct + h2_big4 + h2_h3_big4 < 0" # correct direction?
-
-full_ordinal_mi_eval_h2_1_r <-  restriktor::goric(full_ordinal_mi_params_r[["est"]], VCOV = full_ordinal_mi_params_r[["VCOV"]],
-                                                hypotheses = list(
-                                                  H2.1), comparison = "complement")
-
-full_ordinal_mi_eval_h2_1_ben_r <- benchmark(full_ordinal_mi_eval_h2_1_r)
-
-# H2.2: 
-# T2 -> BiG4
-# If H1+, then:
-
-H2.2 <- "h3.2direct + t2_big4 < 0" # correct direction?
-
-full_ordinal_mi_eval_h2_2_r <- restriktor::goric(full_ordinal_mi_params_r[["est"]], VCOV = full_ordinal_mi_params_r[["VCOV"]],
-                                               hypotheses = list(
-                                                 H2.2), comparison = "complement")
-
-full_ordinal_mi_eval_h2_2_ben_r <- benchmark(full_ordinal_mi_eval_h2_2_r)
-
-# Explanatory paths
-H3.1partneg <- "h3.1indirect < 0 ; abs(h3.1direct) > 0" 
-
-H3.1partneg_mi_eval_r <- restriktor::goric(full_ordinal_mi_params_r[["est"]], VCOV = full_ordinal_mi_params_r[["VCOV"]],
-                                         hypotheses = list(
-                                           H3.1partneg = H3.1partneg), comparison = "complement")
-
-benchmark(H3.1partneg_mi_eval_r)
-
-H3.2partneg_mi_eval_r <- restriktor::goric(full_ordinal_mi_params_r[["est"]], VCOV = full_ordinal_mi_params_r[["VCOV"]],
-                                         hypotheses = list(
-                                           H3.2partneg = H3.2partneg), comparison = "complement")
-benchmark(H3.2partneg_mi_eval_r)
-
+# --- Results ---
+defined_by_model %>% View()
 
 
