@@ -2708,6 +2708,14 @@ Inc3 ~~ College
 ParRit ~~ CR2_l + CR3 + PR2_l + PR3
 "
 
+lavaan.mi::sem.mi(
+  base_nest_ord, mice.imp,
+  estimator="WLSMV", parameterization="theta",
+  meanstructure=TRUE,
+  ordered=c("BiG1","BiG2","BiG3","BiG4","ParRit","PR2","PR3","CR2","CR3","H2","H3","T2","PST"),
+  missing="listwise", control=list(iter.max=10e5)
+) %>% fitmeasures()
+
 # ---- 2) Activator: free blocks by name ----
 free_blocks <- function(model, blocks = character(0)) {
   m <- model
@@ -2771,13 +2779,14 @@ tab$TLI   <- sprintf("%.3f", tab$TLI)
 tab$SRMR  <- sprintf("%.3f", tab$SRMR)
 
 tab
-# openxlsx::write.xlsx(tab, "nested_11_models_scaled_fits.xlsx")
+
+openxlsx::write.xlsx(tab, "nested_models_scaled_fits.xlsx")
 
 library(dplyr)
 library(purrr)
 library(tibble)
 
-# Robustly fetch a parameter table from a lavaan.mi fit
+# fetch a parameter table from a lavaan.mi fit
 get_par_table <- function(fit) {
   tryCatch({
     as_tibble(lavaan::lavInspect(fit, "parTable"))
@@ -2795,7 +2804,7 @@ get_par_table <- function(fit) {
   })
 }
 
-# 1) All user-defined (':=') parameters per model in `fits`
+# All user-defined (':=') parameters per model in `fits`
 defined_by_model <- imap(
   fits,
   ~ parameterEstimates.mi(.x, asymptotic = TRUE) %>%
