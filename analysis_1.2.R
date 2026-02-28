@@ -611,9 +611,6 @@ df_plot %>%
   arrange(MS)
 
 ## Summaries -------------------------------------------------------------
-
-
-
 # Summarize the data
 dfSummary(df)
 quantile(df$MS1, na.rm = T)
@@ -637,13 +634,9 @@ df_forimp$id <- NULL
 constant_vars <- names(df_forimp)[sapply(df_forimp, function(x) length(unique(x)) == 1)]
 df_forimp <- df_forimp[ , !(names(df_forimp) %in% constant_vars)]
 
-# Remove perfectly collinear dummy variables (if categorical vars were already dummy-coded)
-df_forimp <- df_forimp[ , !duplicated(t(df_forimp))]  # Remove duplicate columns
-
-
 df_forimp <- df_forimp %>%
   mutate(across(
-    c(EDATT_W4, FirstParEd, SecondParEd, ETHRACE,
+    c(EDATT_W4, FirstParEd, SecondParEd,
       CR2_1, CR2_2, CR3_1, CR3_2, CR4_1, CR4_2, MS1, H2, H3, H4, T2, PR2, PR3, PR4, ParRit, PST),
     ~ factor(.x, ordered = TRUE)
   ))
@@ -658,7 +651,7 @@ df_forimp <- df_forimp %>%
 # List of variables to impute 
 vars_to_impute <- c(
   "BiG2","BiG3","BiG4",
-  "MS1","Age","Male",
+  "MS1",
   "ParEd_ord","EDATT_W4",
   "Inc3","Inc4",
   "PR2","PR3","PR4","CR2","CR3","CR4",
@@ -691,8 +684,6 @@ for (v in vars_to_impute) {
 }
 
 
-
-
 passive_map <- c(
   College    = "~I(as.integer(EDATT_W4 == '3'))",
   AAVOC      = "~I(as.integer(EDATT_W4 == '2'))",
@@ -706,7 +697,7 @@ passive_map <- c(
   BlackProt  = "~I(as.integer(RELTRAD == 'BlackProt'))",
   Catholic   = "~I(as.integer(RELTRAD == 'Catholic'))",
   Jewish     = "~I(as.integer(RELTRAD == 'Jewish'))",
-  OtherRel     = "~I(as.integer(RELTRAD == 'Other'))",
+  OtherRel   = "~I(as.integer(RELTRAD == 'Other'))",
   None       = "~I(as.integer(RELTRAD == 'None'))",
   INDE       = "~I(as.integer(RELTRAD == 'INDE'))")
 
@@ -747,11 +738,13 @@ predictorMatrix[, intersect(vars, colnames(predictorMatrix))] <- 0
 parents_present <- intersect(c("ETHRACE","EDATT_W4","ParEd_ord","RELTRAD"), colnames(predictorMatrix))
 dummy_candidates <- intersect(c("BlackE","LatinxE","OtherE",
                                 "College","AAVOC","ParCollege","ParAAVOC",
-                                "ConProt","MainProt","BlackProt","Catholic","Jewish","Other","None","INDE"),
+                                "ConProt","MainProt","BlackProt","Catholic","Jewish","OtherRel","None","INDE"),
                               colnames(predictorMatrix))
 if (length(parents_present)) {
   predictorMatrix[, dummy_candidates] <- 0
 }
+
+
 
 # --- Summary Table of Imputation Settings ---
 missing_pct <- sapply(df_forimp, function(x) sum(is.na(x)) / length(x)) * 100
@@ -771,10 +764,12 @@ imputation_summary[imputation_summary$UsedAsPredictor == TRUE,]
 imputation_summary[imputation_summary$Method != "",]
 imputation_summary
 
+
 # --- Step 3: Run the imputation ---
 df_imp <- mice::mice(
   df_forimp, m = N.Imp, method = method, predictorMatrix = predictorMatrix,
-  maxit = max.it, seed = seed
+  maxit = max.it, seed = seed, polr.to.loggedEvents	= TRUE
+
 )
 log <- df_imp$loggedEvents
 
